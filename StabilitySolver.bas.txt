@@ -1,0 +1,666 @@
+Attribute VB_Name = "StabilitySolver"
+' ============================================================
+'  STRUCTURAL STABILITY SOLVER - Chapter 1 (Chen & Lui)
+'  Solves like Professor: Bifurcation + Energy + Large Deflection + Imperfection
+' ============================================================
+Option Explicit
+
+' ---------- Public state ----------
+Private nPts As Long, nBars As Long
+Private Px() As Double, Py() As Double
+Private PtType() As String          ' Hinge / Roller / Free / Fixed
+Private kRot() As Double            ' rotational spring at point (k_s)
+Private kTrans() As Double          ' translational spring at point
+Private Pload() As Double           ' compressive axial load applied at point
+Private Mload() As Double           ' applied moment at point (for imperfection studies)
+Private Theta0() As Double          ' geometric imperfection angle for connected bar (rad)
+Private barI() As Long, barJ() As Long
+Private barL() As Double
+
+' ============================================================
+'  ENTRY POINT
+' ============================================================
+Public Sub SolveProblem()
+    On Error GoTo eh
+    Application.ScreenUpdating = False
+    ReadInput
+    DrawProblem
+    BuildAndSolve
+    Application.ScreenUpdating = True
+    ThisWorkbook.Sheets("Solution").Activate
+    MsgBox "Solved successfully (Professor-style).", vbInformation
+    Exit Sub
+eh:
+    Application.ScreenUpdating = True
+    MsgBox "Error: " & Err.Description, vbCritical
+End Sub
+
+' ============================================================
+'  READ INPUT
+' ============================================================
+Private Sub ReadInput()
+    Dim ws As Worksheet: Set ws = ThisWorkbook.Sheets("Input")
+    Dim r As Long
+    
+    ' Points
+    r = 4
+    Do While Len(ws.Cells(r, 2).Value) > 0
+        r = r + 1
+    Loop
+    nPts = r - 4
+    If nPts < 2 Then Err.Raise 1001, , "At least 2 points required."
+    ReDim Px(1 To nPts), Py(1 To nPts), PtType(1 To nPts)
+    ReDim kRot(1 To nPts), kTrans(1 To nPts)
+    ReDim Pload(1 To nPts), Mload(1 To nPts)
+    
+    Dim i As Long
+    For i = 1 To nPts
+        Px(i) = CDbl(ws.Cells(3 + i, 3).Value)
+        Py(i) = CDbl(ws.Cells(3 + i, 4).Value)
+        PtType(i) = UCase$(Trim$(CStr(ws.Cells(3 + i, 5).Value)))
+        kRot(i) = Val(ws.Cells(3 + i, 6).Value)
+        kTrans(i) = Val(ws.Cells(3 + i, 7).Value)
+        Pload(i) = Val(ws.Cells(3 + i, 8).Value)
+        Mload(i) = Val(ws.Cells(3 + i, 9).Value)
+    Next i
+    
+    ' Bars
+    r = 4
+    Do While Len(ws.Cells(r, 12).Value) > 0
+        r = r + 1
+    Loop
+    nBars = r - 4
+    If nBars < 1 Then Err.Raise 1002, , "At least 1 bar required."
+    ReDim barI(1 To nBars), barJ(1 To nBars), barL(1 To nBars)
+    ReDim Theta0(1 To nBars)
+    
+    For i = 1 To nBars
+        barI(i) = CLng(ws.Cells(3 + i, 12).Value)
+        barJ(i) = CLng(ws.Cells(3 + i, 13).Value)
+        barL(i) = Sqr((Px(barJ(i)) - Px(barI(i))) ^ 2 + (Py(barJ(i)) - Py(barI(i))) ^ 2)
+        Theta0(i) = Val(ws.Cells(3 + i, 14).Value)
+    Next i
+End Sub
+
+' ============================================================
+'  DRAW PROBLEM (Excel shapes)
+' ============================================================
+Private Sub DrawProblem()
+    Dim ws As Worksheet: Set ws = ThisWorkbook.Sheets("Drawing")
+    Dim sh As Shape
+    For Each sh In ws.Shapes: sh.Delete: Next
+    ws.Cells.Clear
+    ws.Cells(1, 1).Value = "PROBLEM SKETCH"
+    ws.Cells(1, 1).Font.Bold = True: ws.Cells(1, 1).Font.Size = 14
+    
+    Dim minX As Double, maxX As Double, minY As Double, maxY As Double
+    minX = Px(1): maxX = Px(1): minY = Py(1): maxY = Py(1)
+    Dim i As Long
+    For i = 2 To nPts
+        If Px(i) < minX Then minX = Px(i)
+        If Px(i) > maxX Then maxX = Px(i)
+        If Py(i) < minY Then minY = Py(i)
+        If Py(i) > maxY Then maxY = Py(i)
+    Next i
+    Dim w As Double: w = maxX - minX: If w = 0 Then w = 1
+    Dim h As Double: h = maxY - minY: If h = 0 Then h = 1
+    Const X0 As Double = 80, Y0 As Double = 250, SCw As Double = 600, SCh As Double = 200
+    
+    Dim sx As Double, sy As Double
+    sx = SCw / w
+    sy = IIf(h > 0, SCh / h, 1)
+    If sy > sx Then sy = sx Else sx = sy   ' uniform scale
+    
+    Dim cx As Double, cy As Double
+    Dim ptX() As Double, ptY() As Double
+    ReDim ptX(1 To nPts), ptY(1 To nPts)
+    For i = 1 To nPts
+        ptX(i) = X0 + (Px(i) - minX) * sx
+        ptY(i) = Y0 - (Py(i) - minY) * sy
+    Next i
+    
+    ' Bars
+    For i = 1 To nBars
+        Set sh = ws.Shapes.AddLine(ptX(barI(i)), ptY(barI(i)), ptX(barJ(i)), ptY(barJ(i)))
+        sh.Line.Weight = 3: sh.Line.ForeColor.RGB = RGB(0, 0, 0)
+    Next i
+    
+    ' Points
+    For i = 1 To nPts
+        Set sh = ws.Shapes.AddShape(msoShapeOval, ptX(i) - 5, ptY(i) - 5, 10, 10)
+        sh.Fill.ForeColor.RGB = RGB(255, 255, 255)
+        sh.Line.ForeColor.RGB = RGB(0, 0, 0)
+        Set sh = ws.Shapes.AddTextbox(msoTextOrientationHorizontal, ptX(i) - 8, ptY(i) - 28, 30, 16)
+        sh.TextFrame.Characters.Text = Chr(64 + i)
+        sh.TextFrame.Characters.Font.Bold = True
+        sh.Line.Visible = msoFalse
+        ' Support symbol
+        Select Case PtType(i)
+            Case "HINGE"
+                Set sh = ws.Shapes.AddShape(msoShapeIsoscelesTriangle, ptX(i) - 8, ptY(i) + 5, 16, 14)
+                sh.Fill.ForeColor.RGB = RGB(180, 180, 180)
+            Case "ROLLER"
+                Set sh = ws.Shapes.AddShape(msoShapeOval, ptX(i) - 7, ptY(i) + 5, 14, 10)
+                sh.Fill.ForeColor.RGB = RGB(180, 180, 180)
+            Case "FIXED"
+                Set sh = ws.Shapes.AddShape(msoShapeRectangle, ptX(i) - 12, ptY(i) + 5, 24, 10)
+                sh.Fill.ForeColor.RGB = RGB(120, 120, 120)
+        End Select
+        ' Springs
+        If kRot(i) > 0 Then
+            Set sh = ws.Shapes.AddShape(msoShapeOval, ptX(i) - 12, ptY(i) - 12, 24, 24)
+            sh.Fill.Visible = msoFalse: sh.Line.ForeColor.RGB = RGB(0, 100, 0)
+            Set sh = ws.Shapes.AddTextbox(msoTextOrientationHorizontal, ptX(i) + 12, ptY(i) - 22, 40, 16)
+            sh.TextFrame.Characters.Text = "k=" & kRot(i)
+            sh.TextFrame.Characters.Font.Color = RGB(0, 100, 0)
+            sh.Line.Visible = msoFalse
+        End If
+        If kTrans(i) > 0 Then
+            Set sh = ws.Shapes.AddShape(msoShapeRightBrace, ptX(i) - 4, ptY(i) + 18, 8, 30)
+            sh.Line.ForeColor.RGB = RGB(0, 100, 0)
+            Set sh = ws.Shapes.AddTextbox(msoTextOrientationHorizontal, ptX(i) + 8, ptY(i) + 28, 40, 16)
+            sh.TextFrame.Characters.Text = "k=" & kTrans(i)
+            sh.TextFrame.Characters.Font.Color = RGB(0, 100, 0)
+            sh.Line.Visible = msoFalse
+        End If
+        ' Loads (P arrow)
+        If Pload(i) <> 0 Then
+            Dim x1 As Double, x2 As Double
+            x1 = ptX(i) + IIf(i = 1, -50, 50): x2 = ptX(i)
+            Set sh = ws.Shapes.AddLine(x1, ptY(i), x2, ptY(i))
+            sh.Line.ForeColor.RGB = RGB(255, 0, 0): sh.Line.Weight = 2
+            sh.Line.EndArrowheadStyle = msoArrowheadTriangle
+            Set sh = ws.Shapes.AddTextbox(msoTextOrientationHorizontal, x1 - 10, ptY(i) - 16, 30, 14)
+            sh.TextFrame.Characters.Text = "P"
+            sh.TextFrame.Characters.Font.Color = RGB(255, 0, 0)
+            sh.TextFrame.Characters.Font.Bold = True
+            sh.Line.Visible = msoFalse
+        End If
+        If Mload(i) <> 0 Then
+            Set sh = ws.Shapes.AddShape(msoShapeCircularArrow, ptX(i) - 12, ptY(i) - 30, 24, 24)
+            sh.Fill.ForeColor.RGB = RGB(255, 0, 0)
+        End If
+    Next i
+End Sub
+
+' ============================================================
+'  SOLVE: Build [K] {θ}={0}, then |K|=0  →  Pcr   (Bifurcation)
+'  Also do Energy Approach with same DOFs.
+' ============================================================
+Private Sub BuildAndSolve()
+    Dim ws As Worksheet: Set ws = ThisWorkbook.Sheets("Solution")
+    ws.Cells.Clear
+    ws.Cells.Font.Name = "Cambria Math"
+    
+    Dim row As Long: row = 1
+    WriteHeader ws, row, "STRUCTURAL STABILITY SOLUTION  (Chen & Lui Ch.1 style)"
+    row = row + 2
+    
+    ' --- Define DOFs: each bar rotates by θ_b ; bars share end displacements ---
+    ' For Chen Ch.1 problems, DOFs are bar rotations θ1..θn (one per bar) BUT
+    ' we use the constraint that connection points have a single transverse displacement.
+    ' Standard formulation: DOF = transverse displacement of each interior joint.
+    ' For each bar k between i & j: rotation θ_k = (v_j - v_i)/L_k (small angle).
+    
+    ' Identify free transverse DOFs (interior joints only; supports = 0).
+    Dim isFree() As Boolean: ReDim isFree(1 To nPts)
+    Dim i As Long
+    For i = 1 To nPts
+        Select Case PtType(i)
+            Case "HINGE", "ROLLER", "FIXED": isFree(i) = False
+            Case Else: isFree(i) = True
+        End Select
+    Next i
+    Dim dof() As Long: ReDim dof(1 To nPts)
+    Dim nDOF As Long: nDOF = 0
+    For i = 1 To nPts
+        If isFree(i) Then nDOF = nDOF + 1: dof(i) = nDOF Else dof(i) = 0
+    Next i
+    
+    ' --------- Energy expressions (symbolic display) ---------
+    WriteSection ws, row, "1) ENERGY APPROACH  (Π = U + W)"
+    row = row + 1
+    
+    Dim Uexpr As String: Uexpr = "U = "
+    Dim termCount As Long: termCount = 0
+    
+    ' Rotational springs at internal points: spring relative angle = θ_left - θ_right
+    For i = 1 To nPts
+        If kRot(i) > 0 And isFree(i) Then
+            Dim leftBar As Long: leftBar = 0
+            Dim rightBar As Long: rightBar = 0
+            Dim b As Long
+            For b = 1 To nBars
+                If barJ(b) = i Then leftBar = b
+                If barI(b) = i Then rightBar = b
+            Next b
+            If leftBar > 0 And rightBar > 0 Then
+                Dim rel As String
+                rel = "(" & ThetaSym(leftBar) & " " & PMSign(-1) & " " & ThetaSym(rightBar) & ")"
+                If termCount > 0 Then Uexpr = Uexpr & " + "
+                Uexpr = Uexpr & "½·k_s·" & rel & "²"
+                termCount = termCount + 1
+            End If
+        End If
+    Next i
+    ' Translational springs - connected to point i transverse displacement v_i
+    For i = 1 To nPts
+        If kTrans(i) > 0 Then
+            If termCount > 0 Then Uexpr = Uexpr & " + "
+            Uexpr = Uexpr & "½·k·v_" & Chr(64 + i) & "²"
+            termCount = termCount + 1
+        End If
+    Next i
+    
+    ws.Cells(row, 1).Value = Uexpr: row = row + 1
+    
+    ' Work done by P: W = -P·Σ L_b(1 - cosθ_b) ≈ -P·Σ ½L_b·θ_b²
+    Dim Wexpr As String: Wexpr = "W = -P·["
+    For b = 1 To nBars
+        If b > 1 Then Wexpr = Wexpr & " + "
+        Wexpr = Wexpr & "L_" & b & "(1 - cosθ_" & b & ")"
+    Next b
+    Wexpr = Wexpr & "]   ≈   -½·P·["
+    For b = 1 To nBars
+        If b > 1 Then Wexpr = Wexpr & " + "
+        Wexpr = Wexpr & "L_" & b & "·θ_" & b & "²"
+    Next b
+    Wexpr = Wexpr & "]"
+    ws.Cells(row, 1).Value = Wexpr: row = row + 2
+    
+    ws.Cells(row, 1).Value = "Equilibrium: ∂Π/∂v_i = 0  for each free DOF i  ⇒  [K]·{v} = {0}"
+    row = row + 2
+    
+    ' --------- Build numerical stiffness K and geometric Kg matrices ---------
+    Dim K() As Double, Kg() As Double
+    ReDim K(1 To nDOF, 1 To nDOF)
+    ReDim Kg(1 To nDOF, 1 To nDOF)
+    
+    ' Translational spring contributions (K)
+    For i = 1 To nPts
+        If kTrans(i) > 0 And dof(i) > 0 Then
+            K(dof(i), dof(i)) = K(dof(i), dof(i)) + kTrans(i)
+        End If
+    Next i
+    
+    ' Rotational spring at internal joint between bars m (i,j) and n (j,k)
+    ' relative rotation = θ_m - θ_n = (v_j - v_i)/L_m - (v_k - v_j)/L_n
+    ' Energy: ½ k_s ((v_j - v_i)/L_m - (v_k - v_j)/L_n)^2
+    For i = 1 To nPts
+        If kRot(i) > 0 Then
+            Dim bm As Long: bm = 0
+            Dim bn As Long: bn = 0
+            Dim bb As Long
+            For bb = 1 To nBars
+                If barJ(bb) = i Then bm = bb
+                If barI(bb) = i Then bn = bb
+            Next bb
+            If bm > 0 And bn > 0 Then
+                Dim Lm As Double: Lm = barL(bm)
+                Dim Ln As Double: Ln = barL(bn)
+                Dim p1 As Long, p2 As Long, p3 As Long
+                p1 = barI(bm): p2 = i: p3 = barJ(bn)
+                ' coefficients on v_p1, v_p2, v_p3
+                Dim a1 As Double, a2 As Double, a3 As Double
+                a1 = -1# / Lm
+                a2 = 1# / Lm + 1# / Ln
+                a3 = -1# / Ln
+                AddOuter K, dof(p1), dof(p2), dof(p3), a1, a2, a3, kRot(i)
+            End If
+        End If
+    Next i
+    
+    ' Geometric stiffness from P: For each bar carrying P,
+    ' ½ P L θ_b² = ½ P (v_j - v_i)²/L  →  contribution P/L on (v_i,v_j) DOFs
+    ' We use total P at the loaded point (assumed compressive line of action through bars).
+    Dim Pmag As Double: Pmag = 0
+    For i = 1 To nPts: If Pload(i) > Pmag Then Pmag = Pload(i)
+    Next i
+    If Pmag = 0 Then Pmag = 1   ' use unit P -> eigenvalue is Pcr
+    
+    For b = 1 To nBars
+        Dim ii As Long, jj As Long
+        ii = dof(barI(b)): jj = dof(barJ(b))
+        Dim coef As Double: coef = Pmag / barL(b)
+        If ii > 0 Then Kg(ii, ii) = Kg(ii, ii) + coef
+        If jj > 0 Then Kg(jj, jj) = Kg(jj, jj) + coef
+        If ii > 0 And jj > 0 Then
+            Kg(ii, jj) = Kg(ii, jj) - coef
+            Kg(jj, ii) = Kg(jj, ii) - coef
+        End If
+    Next b
+    
+    ' --------- Section: Bifurcation Approach ---------
+    WriteSection ws, row, "2) BIFURCATION APPROACH  —  [K] − P[Kg]·{v} = {0}"
+    row = row + 1
+    ws.Cells(row, 1).Value = "Free DOFs (transverse displacement at each interior joint):"
+    row = row + 1
+    Dim s As String: s = "{ "
+    For i = 1 To nPts
+        If dof(i) > 0 Then s = s & "v_" & Chr(64 + i) & "  "
+    Next i
+    s = s & "}"
+    ws.Cells(row, 1).Value = s: row = row + 2
+    
+    ws.Cells(row, 1).Value = "Stiffness matrix [K]  (from springs):"
+    row = row + 1
+    PrintMatrix ws, row, K, nDOF
+    row = row + nDOF + 2
+    
+    ws.Cells(row, 1).Value = "Geometric stiffness [Kg]  (from P, with P factored out as unit):"
+    row = row + 1
+    PrintMatrix ws, row, Kg, nDOF
+    row = row + nDOF + 2
+    
+    ' --------- Solve generalized eigenvalue problem K v = λ Kg v ---------
+    Dim eigs() As Double, vecs() As Double
+    SolveGenEig K, Kg, nDOF, eigs, vecs
+    
+    ws.Cells(row, 1).Value = "Characteristic equation:  | [K] − λ [Kg] | = 0"
+    row = row + 1
+    ws.Cells(row, 1).Value = "Eigenvalues  (λ = P_cr candidates):"
+    row = row + 1
+    Dim minLam As Double: minLam = 1E+30
+    Dim minIdx As Long: minIdx = 1
+    For i = 1 To nDOF
+        ws.Cells(row, 1).Value = "λ_" & i & " = " & FmtNum(eigs(i))
+        If eigs(i) > 0 And eigs(i) < minLam Then minLam = eigs(i): minIdx = i
+        row = row + 1
+    Next i
+    row = row + 1
+    
+    ws.Cells(row, 1).Value = "P_cr = smallest positive eigenvalue = " & FmtNum(minLam)
+    ws.Cells(row, 1).Font.Bold = True
+    ws.Cells(row, 1).Font.Color = RGB(192, 0, 0)
+    row = row + 2
+    
+    ws.Cells(row, 1).Value = "Buckling Mode Shapes (eigenvectors):"
+    row = row + 1
+    Dim c As Long
+    ws.Cells(row, 1).Value = "DOF"
+    For c = 1 To nDOF: ws.Cells(row, 1 + c).Value = "Mode " & c: Next c
+    row = row + 1
+    Dim k2 As Long: k2 = 0
+    For i = 1 To nPts
+        If dof(i) > 0 Then
+            k2 = k2 + 1
+            ws.Cells(row, 1).Value = "v_" & Chr(64 + i)
+            For c = 1 To nDOF
+                ws.Cells(row, 1 + c).Value = FmtNum(vecs(k2, c))
+            Next c
+            row = row + 1
+        End If
+    Next i
+    row = row + 1
+    
+    ' --------- Section: Stability of equilibrium ---------
+    WriteSection ws, row, "3) STABILITY CHECK  (∂²Π / ∂v_i² > 0  &  det>0)"
+    row = row + 1
+    Dim Kp As Double, Kpp As Double, Kxy As Double
+    If nDOF = 1 Then
+        ws.Cells(row, 1).Value = "∂²Π/∂v² = " & FmtNum(K(1, 1)) & " − P·" & FmtNum(Kg(1, 1))
+        row = row + 1
+        ws.Cells(row, 1).Value = "Stable  if  P < " & FmtNum(K(1, 1) / Kg(1, 1))
+    ElseIf nDOF >= 2 Then
+        ws.Cells(row, 1).Value = "Conditions:  ∂²Π/∂v_i² > 0  for all i,  AND  det( ∂²Π / ∂v_i ∂v_j ) > 0"
+        row = row + 1
+        ws.Cells(row, 1).Value = "Critical (governing) load = P_cr = " & FmtNum(minLam)
+    End If
+    row = row + 2
+    
+    ' --------- Section: Large Deflection (Energy) ---------
+    WriteSection ws, row, "4) LARGE DEFLECTION  (post-buckling path,  using sin/cos)"
+    row = row + 1
+    ws.Cells(row, 1).Value = "Equilibrium:  dΠ/dθ = 0   ⇒   P = (Σ k·θ-terms) / (L·sinθ)"
+    row = row + 1
+    ws.Cells(row, 1).Value = "For single-DOF problems  P(θ) is plotted in 'PostBuckling' sheet."
+    row = row + 2
+    If nDOF = 1 Then PlotPostBuckling K(1, 1), Kg(1, 1), minLam
+    
+    ' --------- Section: Imperfection ---------
+    WriteSection ws, row, "5) GEOMETRIC IMPERFECTION  (initial angle θ₀ in bar)"
+    row = row + 1
+    Dim hasImp As Boolean: hasImp = False
+    For b = 1 To nBars: If Theta0(b) <> 0 Then hasImp = True
+    Next b
+    If hasImp Then
+        ws.Cells(row, 1).Value = "Imperfect equilibrium:  P = k·(θ−θ₀) / (L·sinθ)"
+        row = row + 1
+        ws.Cells(row, 1).Value = "Plotted in 'Imperfection' sheet for given θ₀."
+        PlotImperfection K(1, 1), Kg(1, 1), Theta0(1)
+    Else
+        ws.Cells(row, 1).Value = "No imperfection given (θ₀ = 0 in all bars). Set θ₀ in Input col N to study."
+    End If
+    row = row + 2
+    
+    ws.Columns("A:H").AutoFit
+End Sub
+
+' ============================================================
+'  Plot post-buckling P-θ curve  (single DOF only)
+' ============================================================
+Private Sub PlotPostBuckling(Kself As Double, Kgself As Double, Pcr As Double)
+    Dim ws As Worksheet
+    On Error Resume Next: Set ws = ThisWorkbook.Sheets("PostBuckling")
+    On Error GoTo 0
+    If ws Is Nothing Then Set ws = ThisWorkbook.Sheets.Add(After:=ThisWorkbook.Sheets("Solution")): ws.Name = "PostBuckling"
+    ws.Cells.Clear
+    ws.Cells(1, 1).Value = "θ (rad)": ws.Cells(1, 2).Value = "P (post-buckling)": ws.Cells(1, 3).Value = "P_cr"
+    Dim i As Long, t As Double
+    For i = 0 To 60
+        t = -1# + i * (2# / 60#)
+        If Abs(t) < 0.0001 Then t = 0.0001
+        ws.Cells(2 + i, 1).Value = t
+        ws.Cells(2 + i, 2).Value = (Kself * t) / (Sin(t)) / Kgself  ' P from energy: K·θ = P·Kg·sinθ form
+        ws.Cells(2 + i, 3).Value = Pcr
+    Next i
+    Dim ch As ChartObject
+    Set ch = ws.ChartObjects.Add(250, 20, 450, 320)
+    ch.Chart.ChartType = xlXYScatterLinesNoMarkers
+    ch.Chart.SetSourceData ws.Range("A1:C62")
+    ch.Chart.HasTitle = True
+    ch.Chart.ChartTitle.Text = "Post-Buckling Path"
+End Sub
+
+Private Sub PlotImperfection(Kself As Double, Kgself As Double, t0 As Double)
+    Dim ws As Worksheet
+    On Error Resume Next: Set ws = ThisWorkbook.Sheets("Imperfection")
+    On Error GoTo 0
+    If ws Is Nothing Then Set ws = ThisWorkbook.Sheets.Add(After:=ThisWorkbook.Sheets("Solution")): ws.Name = "Imperfection"
+    ws.Cells.Clear
+    ws.Cells(1, 1).Value = "θ (rad)": ws.Cells(1, 2).Value = "P (imperfect)"
+    Dim i As Long, t As Double
+    For i = 0 To 60
+        t = t0 + 0.0001 + i * (1.5 / 60#)
+        ws.Cells(2 + i, 1).Value = t
+        ws.Cells(2 + i, 2).Value = Kself * (t - t0) / (Sin(t)) / Kgself
+    Next i
+    Dim ch As ChartObject
+    Set ch = ws.ChartObjects.Add(250, 20, 450, 320)
+    ch.Chart.ChartType = xlXYScatterLinesNoMarkers
+    ch.Chart.SetSourceData ws.Range("A1:B62")
+    ch.Chart.HasTitle = True
+    ch.Chart.ChartTitle.Text = "Imperfect System  (θ₀=" & t0 & ")"
+End Sub
+
+' ============================================================
+'  HELPERS
+' ============================================================
+Private Sub WriteHeader(ws As Worksheet, r As Long, t As String)
+    ws.Cells(r, 1).Value = t
+    ws.Cells(r, 1).Font.Bold = True
+    ws.Cells(r, 1).Font.Size = 14
+    ws.Cells(r, 1).Font.Color = RGB(0, 32, 96)
+End Sub
+Private Sub WriteSection(ws As Worksheet, r As Long, t As String)
+    ws.Cells(r, 1).Value = t
+    ws.Cells(r, 1).Font.Bold = True
+    ws.Cells(r, 1).Font.Size = 12
+    ws.Cells(r, 1).Font.Color = RGB(192, 0, 0)
+End Sub
+Private Function ThetaSym(b As Long) As String
+    ThetaSym = "θ_" & b
+End Function
+Private Function PMSign(s As Long) As String
+    If s > 0 Then PMSign = "+" Else PMSign = "−"
+End Function
+Private Function FmtNum(x As Double) As String
+    If Abs(x) < 0.0001 Then FmtNum = "0" Else FmtNum = Format$(x, "0.####")
+End Function
+
+Private Sub PrintMatrix(ws As Worksheet, r As Long, M() As Double, n As Long)
+    Dim i As Long, j As Long
+    For i = 1 To n
+        For j = 1 To n
+            ws.Cells(r + i - 1, j).Value = FmtNum(M(i, j))
+        Next j
+    Next i
+    ws.Range(ws.Cells(r, 1), ws.Cells(r + n - 1, n)).Borders.LineStyle = xlContinuous
+End Sub
+
+Private Sub AddOuter(M() As Double, d1 As Long, d2 As Long, d3 As Long, _
+                     a1 As Double, a2 As Double, a3 As Double, k As Double)
+    ' Adds k * (a1·v1 + a2·v2 + a3·v3)^2 contribution to M
+    Dim arr(1 To 3) As Double, dd(1 To 3) As Long
+    arr(1) = a1: arr(2) = a2: arr(3) = a3
+    dd(1) = d1: dd(2) = d2: dd(3) = d3
+    Dim i As Long, j As Long
+    For i = 1 To 3
+        For j = 1 To 3
+            If dd(i) > 0 And dd(j) > 0 Then
+                M(dd(i), dd(j)) = M(dd(i), dd(j)) + k * arr(i) * arr(j)
+            End If
+        Next j
+    Next i
+End Sub
+
+' ----- Solve generalized eigenvalue K v = lam Kg v  via Kg^-1 K -> standard eig -----
+Private Sub SolveGenEig(K() As Double, Kg() As Double, n As Long, _
+                        eigs() As Double, vecs() As Double)
+    Dim KgInv() As Double, A() As Double
+    InvertMatrix Kg, n, KgInv
+    MatMul KgInv, K, n, A      ' A = Kg^-1 * K
+    JacobiEig A, n, eigs, vecs ' if A symmetric not guaranteed; use QR-like
+End Sub
+
+Private Sub InvertMatrix(M() As Double, n As Long, Inv() As Double)
+    Dim Aug() As Double
+    ReDim Aug(1 To n, 1 To 2 * n)
+    Dim i As Long, j As Long, k As Long
+    For i = 1 To n
+        For j = 1 To n
+            Aug(i, j) = M(i, j)
+        Next j
+        Aug(i, n + i) = 1#
+    Next i
+    For i = 1 To n
+        ' partial pivot
+        Dim piv As Long: piv = i
+        Dim mx As Double: mx = Abs(Aug(i, i))
+        For k = i + 1 To n
+            If Abs(Aug(k, i)) > mx Then mx = Abs(Aug(k, i)): piv = k
+        Next k
+        If piv <> i Then
+            For j = 1 To 2 * n
+                Dim tmp As Double: tmp = Aug(i, j): Aug(i, j) = Aug(piv, j): Aug(piv, j) = tmp
+            Next j
+        End If
+        If Abs(Aug(i, i)) < 1E-14 Then Err.Raise 2001, , "Matrix singular."
+        Dim d As Double: d = Aug(i, i)
+        For j = 1 To 2 * n: Aug(i, j) = Aug(i, j) / d: Next j
+        For k = 1 To n
+            If k <> i Then
+                Dim f As Double: f = Aug(k, i)
+                For j = 1 To 2 * n: Aug(k, j) = Aug(k, j) - f * Aug(i, j): Next j
+            End If
+        Next k
+    Next i
+    ReDim Inv(1 To n, 1 To n)
+    For i = 1 To n: For j = 1 To n: Inv(i, j) = Aug(i, n + j): Next j: Next i
+End Sub
+
+Private Sub MatMul(A() As Double, B() As Double, n As Long, C() As Double)
+    ReDim C(1 To n, 1 To n)
+    Dim i As Long, j As Long, k As Long
+    For i = 1 To n
+        For j = 1 To n
+            Dim s As Double: s = 0
+            For k = 1 To n: s = s + A(i, k) * B(k, j): Next k
+            C(i, j) = s
+        Next j
+    Next i
+End Sub
+
+' QR-based eigenvalue (for nonsymmetric small n).
+' For n<=4 (typical Ch.1) we do power-iteration deflation.
+Private Sub JacobiEig(A() As Double, n As Long, eigs() As Double, vecs() As Double)
+    ReDim eigs(1 To n)
+    ReDim vecs(1 To n, 1 To n)
+    Dim Acopy() As Double: ReDim Acopy(1 To n, 1 To n)
+    Dim i As Long, j As Long
+    For i = 1 To n: For j = 1 To n: Acopy(i, j) = A(i, j): Next j: Next i
+    
+    Dim k As Long
+    For k = 1 To n
+        Dim v() As Double: ReDim v(1 To n)
+        Dim lam As Double
+        PowerIter Acopy, n, lam, v
+        eigs(k) = lam
+        For i = 1 To n: vecs(i, k) = v(i): Next i
+        ' Deflate: A = A - lam * v v^T / (v^T v)
+        Dim vv As Double: vv = 0
+        For i = 1 To n: vv = vv + v(i) * v(i): Next i
+        If vv > 0 Then
+            For i = 1 To n
+                For j = 1 To n
+                    Acopy(i, j) = Acopy(i, j) - lam * v(i) * v(j) / vv
+                Next j
+            Next i
+        End If
+    Next k
+    SortEigs eigs, vecs, n
+End Sub
+
+Private Sub PowerIter(A() As Double, n As Long, lam As Double, v() As Double)
+    Dim i As Long, j As Long, it As Long
+    ReDim v(1 To n)
+    For i = 1 To n: v(i) = 1: Next i
+    Dim w() As Double: ReDim w(1 To n)
+    Dim lamOld As Double: lamOld = 0
+    For it = 1 To 200
+        For i = 1 To n
+            Dim s As Double: s = 0
+            For j = 1 To n: s = s + A(i, j) * v(j): Next j
+            w(i) = s
+        Next i
+        ' Rayleigh quotient
+        Dim num As Double: num = 0
+        Dim den As Double: den = 0
+        For i = 1 To n: num = num + v(i) * w(i): den = den + v(i) * v(i): Next i
+        If den = 0 Then Exit For
+        lam = num / den
+        ' normalize
+        Dim mx As Double: mx = 0
+        For i = 1 To n: If Abs(w(i)) > mx Then mx = Abs(w(i))
+        Next i
+        If mx = 0 Then Exit For
+        For i = 1 To n: v(i) = w(i) / mx: Next i
+        If Abs(lam - lamOld) < 0.0000001 Then Exit For
+        lamOld = lam
+    Next it
+End Sub
+
+Private Sub SortEigs(eigs() As Double, vecs() As Double, n As Long)
+    Dim i As Long, j As Long
+    For i = 1 To n - 1
+        For j = i + 1 To n
+            If eigs(j) < eigs(i) Then
+                Dim t As Double: t = eigs(i): eigs(i) = eigs(j): eigs(j) = t
+                Dim r As Long
+                For r = 1 To n
+                    Dim tt As Double: tt = vecs(r, i): vecs(r, i) = vecs(r, j): vecs(r, j) = tt
+                Next r
+            End If
+        Next j
+    Next i
+End Sub
