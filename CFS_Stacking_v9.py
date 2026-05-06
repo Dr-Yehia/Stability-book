@@ -73,8 +73,9 @@ def assign_group(st):
 
 df["SG"] = df["Section Types"].apply(assign_group)
 
-# v10 FIX #1: Split G5_C2C by FM (Flexural vs non-Flexural)
-df.loc[(df["SG"]=="G5_C2C") & (df["FM"].isin(["F","LF"])), "SG"] = "G5a_C2C_Flex"
+# v10 FIX #1: Split G5_C2C by FM (F / LF / Other — each separate)
+df.loc[(df["SG"]=="G5_C2C") & (df["FM"]=="F"),  "SG"] = "G5a_C2C_F"
+df.loc[(df["SG"]=="G5_C2C") & (df["FM"]=="LF"), "SG"] = "G5c_C2C_LF"
 df.loc[df["SG"]=="G5_C2C", "SG"] = "G5b_C2C_Other"
 
 print("\nSection Groups (v10 — G5 split):")
@@ -284,7 +285,7 @@ for g in groups:
     global_r2_g = r2_score(yg_tr_g, oof_global[tr_mask])
     print(f"  Specialist OOF R² = {r2_g:.4f}  |  Global R² = {global_r2_g:.4f}")
 
-    if r2_g > global_r2_g - 0.005:   # allow up to 0.005 worse (bias-variance tradeoff)
+    if r2_g > global_r2_g + 0.002:   # specialist must actually beat global
         # FIX #3: Per-group Ridge blend of specialist + global
         B_blend_tr = np.column_stack([oof_g, oof_global[tr_mask]])
         B_blend_te = np.column_stack(
