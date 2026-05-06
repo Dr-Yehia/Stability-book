@@ -125,12 +125,12 @@ for col, grp in [("section_target_enc", "Section Types"),
 print("✅  Target encoding recomputed on train-only (no leakage)")
 
 # ── CELL 5 ── Hyperparameters ──────────────────────────────────────────────────
-# NOTE: early_stopping_rounds is passed to the CONSTRUCTOR in XGBoost ≥ 2.0
+# NOTE: early_stopping_rounds removed from constructor for Kaggle compatibility
+#       → handled via callbacks / fit() fallback below
 PARAMS_XGB = dict(
     n_estimators=5000,       learning_rate=0.008,   max_depth=6,
     subsample=0.85,          colsample_bytree=0.70,
     min_child_weight=2,      reg_alpha=0.3,         reg_lambda=1.5,
-    early_stopping_rounds=150,                       # ← constructor, not fit()
     random_state=42,         n_jobs=-1,             verbosity=0
 )
 PARAMS_LGB = dict(
@@ -145,7 +145,17 @@ PARAMS_CAT = dict(
     early_stopping_rounds=150,
     random_seed=42,          verbose=0
 )
-print("✅  Hyperparameters ready  (5 000 trees @ lr=0.008)")
+
+# XGBoost early-stopping: detect version and use the right method
+import xgboost as _xgb
+_xgb_major = int(_xgb.__version__.split('.')[0])
+if _xgb_major >= 2:
+    PARAMS_XGB['early_stopping_rounds'] = 150   # constructor (XGB ≥ 2.0)
+    _XGB_FIT_ES = {}                              # nothing extra for fit()
+else:
+    _XGB_FIT_ES = {'early_stopping_rounds': 150}  # fit() kwarg (XGB < 2.0)
+
+print(f"✅  Hyperparameters ready  (5 000 trees @ lr=0.008, xgb={_xgb.__version__})")
 
 # ── CELL 6 ── 10-Fold OOF Stacking ────────────────────────────────────────────
 N_FOLDS = 10
@@ -165,9 +175,9 @@ for fold, (tri, vai) in enumerate(kf.split(X_tr_np), 1):
     Xf, Xv = X_tr_np[tri], X_tr_np[vai]
     yf, yv = y_tr_np[tri], y_tr_np[vai]
 
-    # XGBoost — early_stopping_rounds already in constructor
+    # XGBoost — early_stopping handled per version
     m = XGBRegressor(**PARAMS_XGB)
-    m.fit(Xf, yf, eval_set=[(Xv, yv)], verbose=False)
+    m.fit(Xf, yf, eval_set=[(Xv, yv)], verbose=False, **_XGB_FIT_ES)
     oof["xgb"][vai]  = m.predict(Xv)
     pred_te["xgb"]  += m.predict(X_te_np) / N_FOLDS
 
