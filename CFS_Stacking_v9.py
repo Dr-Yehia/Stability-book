@@ -114,6 +114,10 @@ df["sqrt_Pne"]  = np.sqrt(np.abs(df["Pne_Py"]))
 df["DSM_l"]     = np.where(df["Pcrl_Py"] >= 0.776**2, 1.0,
                     (1 - 0.15 * df["Pcrl_Py"]**0.4) * df["Pcrl_Py"]**0.4)
 
+# v10: Flexural indicator features
+df["is_F"]      = (df["FM"] == "F").astype(int)
+df["Pne_x_isF"] = df["is_F"] * df["Pne_Py"]
+
 le_fm = LabelEncoder(); df["FM_enc"] = le_fm.fit_transform(df["FM"])
 le_bc = LabelEncoder(); df["BC_enc"] = le_bc.fit_transform(df["BC"].astype(str))
 le_st = LabelEncoder(); df["ST_enc"] = le_st.fit_transform(df["Section Types"].astype(str))
@@ -128,6 +132,7 @@ BASE_FEATURES = [
     "KL_λc", "λc_Pne", "λled_Pcrl", "Pne_Pcrl", "λc3", "λled3",
     "inv_λc", "λc_inv_led", "Pcrl_sq", "Pne_sq", "h_t_b_t",
     "Fy_norm", "A_t2", "Pcrl_Pne", "sqrt_Pcrl", "sqrt_Pne", "DSM_l",
+    "is_F", "Pne_x_isF",
     "FM_enc", "BC_enc", "ST_enc", "SG_enc",
 ]
 # Target encoding columns — added AFTER split
@@ -288,10 +293,8 @@ for g in groups:
     if r2_g > global_r2_g + 0.002:   # specialist must actually beat global
         # FIX #3: Per-group Ridge blend of specialist + global
         B_blend_tr = np.column_stack([oof_g, oof_global[tr_mask]])
-        B_blend_te = np.column_stack(
-            [pte_g, pte_global[te_mask]] if n_te > 0
-            else [pte_g, pte_global[te_mask]]
-        )
+        B_blend_te = np.column_stack([pte_g, pte_global[te_mask]]) if n_te > 0 \
+            else np.zeros((1, 2))
         ridge_blend = Ridge(alpha=0.01)
         ridge_blend.fit(B_blend_tr, yg_tr_g)
         final_oof[tr_mask] = ridge_blend.predict(B_blend_tr)
@@ -369,7 +372,8 @@ r2_te = report("TEST ◀ KEY RESULT",
 # ═══════════════════════════════════════════════════════════
 fig, axes = plt.subplots(1, 2, figsize=(14, 6))
 sg_colors = {"G1_O2C":"#01696f", "G2_O2U":"#d4380d", "G3_CUC":"#7a39bb",
-             "G4_HC":"#0958d9",  "G5_C2C":"#389e0d", "G6_Open":"#cf1322",
+             "G4_HC":"#0958d9",  "G5a_C2C_F":"#ff4d4f", "G5b_C2C_Other":"#389e0d",
+             "G5c_C2C_LF":"#95de64", "G6_Open":"#cf1322",
              "G7a_Box":"#fa8c16","G7b_Rest":"gray"}
 c_arr = [sg_colors.get(s, "gray") for s in SG_te]
 
