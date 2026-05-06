@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """
-CFS v9-fix — Section-Type Specialist Models (PATCHED)
-═══════════════════════════════════════════════════════
-Fixes vs v9-original:
+CFS v10 — Section-Type Specialist Models (v9-fix + 3 patches)
+═══════════════════════════════════════════════════════════════
+v10 patches vs v9-fix:
   1. Target encoding computed AFTER split (no leakage)
   2. early_stopping_rounds = 300 (was 150)
   3. Per-group Ridge blend (learned, not fixed 70/30)
@@ -72,7 +72,12 @@ def assign_group(st):
     return "G7b_Rest"
 
 df["SG"] = df["Section Types"].apply(assign_group)
-print("\nSection Groups:")
+
+# v10 FIX #1: Split G5_C2C by FM (Flexural vs non-Flexural)
+df.loc[(df["SG"]=="G5_C2C") & (df["FM"].isin(["F","LF"])), "SG"] = "G5a_C2C_Flex"
+df.loc[df["SG"]=="G5_C2C", "SG"] = "G5b_C2C_Other"
+
+print("\nSection Groups (v10 — G5 split):")
 print(df["SG"].value_counts().to_string())
 
 # ═══════════════════════════════════════════════════════════
@@ -181,16 +186,20 @@ def train_group(name, Xg_tr, yg_tr, Xg_te, n_folds=None):
     if n_folds is None:
         n_folds = max(3, min(10, n // 15))
 
+    # v10 FIX #2: Huber loss for outlier robustness
     p_xgb = dict(n_estimators=8000, learning_rate=0.008, max_depth=8,
         subsample=0.80, colsample_bytree=0.65, min_child_weight=1,
         reg_alpha=0.05, reg_lambda=0.5,
+        objective="reg:pseudohubererror",
         random_state=42, n_jobs=-1, verbosity=0, **_xgb_es)
     p_lgb = dict(n_estimators=8000, learning_rate=0.008, num_leaves=255,
         subsample=0.80, colsample_bytree=0.65, reg_alpha=0.05, reg_lambda=0.5,
         min_child_samples=max(3, n//100),
+        objective="huber", alpha=0.9,
         random_state=42, n_jobs=-1, verbose=-1)
     p_cat = dict(iterations=8000, learning_rate=0.008,
         depth=min(9, max(6, n//30)), l2_leaf_reg=1.5, subsample=0.80,
+        loss_function="Huber:delta=0.5",
         early_stopping_rounds=ES, random_seed=42, verbose=0)
 
     kf = KFold(n_splits=n_folds, shuffle=True, random_state=42)
@@ -234,8 +243,14 @@ def train_group(name, Xg_tr, yg_tr, Xg_te, n_folds=None):
 print("\n" + "═"*60)
 print("  PHASE 0: Global fallback model")
 print("═"*60)
+# v10 FIX #3: Winsorize target before training
+y_lo = np.percentile(y_tr_np, 1)
+y_hi = np.percentile(y_tr_np, 99)
+y_tr_w = np.clip(y_tr_np, y_lo, y_hi)
+print(f"  Winsorize: [{y_lo:.3f}, {y_hi:.3f}] — {(y_tr_np!=y_tr_w).sum()} values clipped")
+
 oof_global, pte_global, r2_global = train_group(
-    "Global", X_tr_np, y_tr_np, X_te_np, n_folds=10)
+    "Global", X_tr_np, y_tr_w, X_te_np, n_folds=10)
 print(f"  Global OOF R²(Pt/Py) = {r2_global:.4f}")
 
 # ═══════════════════════════════════════════════════════════
@@ -263,6 +278,7 @@ for g in groups:
     Xg_tr_g = X_tr_np[tr_mask]
     yg_tr_g  = y_tr_np[tr_mask]
     Xg_te_g  = X_te_np[te_mask] if n_te > 0 else np.zeros((1, X_tr_np.shape[1]))
+    yg_tr_g  = np.clip(yg_tr_g, y_lo, y_hi)  # winsorize per group too
 
     oof_g, pte_g, r2_g = train_group(g, Xg_tr_g, yg_tr_g, Xg_te_g)
     global_r2_g = r2_score(yg_tr_g, oof_global[tr_mask])
@@ -419,7 +435,7 @@ pd.DataFrame({
 print("✅  v9_predictions.csv saved")
 
 print(f"\n{'═'*62}")
-print(f"  🎯  v9-fix COMPLETE")
+print(f"  🎯  v10 COMPLETE")
 print(f"  Test R²(Pt/Py) = {r2_te:.6f}")
 print(f"  Target: R² ≥ 0.980")
 print(f"{'═'*62}")
