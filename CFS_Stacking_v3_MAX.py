@@ -1,14 +1,14 @@
 #!/usr/bin/env python3
 """
 ================================================================================
-CFS Built-up Columns — Maximum Performance Pipeline v3.1
+CFS Built-up Columns — Maximum Performance Pipeline v3.2
 ================================================================================
 Strategy:
   1. Target Encoding for Section Types (no leakage, train-only)
   2. 10-Fold OOF Stacking  (XGB + LGB + CatBoost, 5000 trees each)
   3. Residual Correction XGBoost  (learns systematic errors)
-  4. MLP Meta-Learner  (128→64→32, fixed early-stopping)
-  5. Optimised Weighted Blend  (Ridge meta on 5 predictors)
+  4. MLP Meta-Learner  (256→128→64→32, fixed early-stopping)
+  5. Ridge Weighted Blend  (5 predictors → final answer)
 
 Expected Test R²  :  0.980 – 0.995
 Expected MAPE     :  < 3.0 %
@@ -32,7 +32,7 @@ from sklearn.linear_model    import Ridge
 from sklearn.neural_network  import MLPRegressor
 from sklearn.preprocessing   import StandardScaler
 from sklearn.metrics         import r2_score, mean_squared_error, mean_absolute_error
-import shap
+import shap, lightgbm as lgb_lib
 
 from xgboost  import XGBRegressor
 from catboost import CatBoostRegressor
@@ -73,18 +73,19 @@ df["Pcrl_λled"] = df["Pcrl_Py"] * df["λ(le-d)"]
 df["KL_λc"]     = df["KL_r"]    * df["λc"]
 df["λc_Pne"]    = df["λc"]      * df["Pne_Py"]
 df["λled_Pcrl"] = df["λ(le-d)"] * df["Pcrl_Py"]
-df["Pne_Pcrl"]  = df["Pne_Py"]  * df["Pcrl_Py"]       # NEW: interaction
-df["λc3"]       = df["λc"]      ** 3                   # NEW: cubic
-df["λled3"]     = df["λ(le-d)"] ** 3                   # NEW: cubic
+df["Pne_Pcrl"]  = df["Pne_Py"]  * df["Pcrl_Py"]
+df["λc3"]       = df["λc"]      ** 3
+df["λled3"]     = df["λ(le-d)"] ** 3
 
-# Target encoding (global mean placeholder — will be recomputed per fold)
+# Target encoding — global placeholder (recomputed per split below)
 global_mean  = df[TARGET].mean()
-section_mean = df.groupby("Section Types")[TARGET].mean()
-bc_mean      = df.groupby("BC")[TARGET].mean()
-df["section_target_enc"] = df["Section Types"].map(section_mean)
-df["bc_target_enc"]      = df["BC"].map(bc_mean)
+df["section_target_enc"] = df.groupby("Section Types")[TARGET].transform("mean")
+df["bc_target_enc"]      = df.groupby("BC")[TARGET].transform("mean")
 
-fm_order = {"L": 0, "D": 1, "GD": 2, "GL": 3, "GDL": 4}
+# Failure Mode — clean whitespace then encode
+df["FM"] = df["FM"].str.strip()
+fm_order = {"L": 0, "D": 1, "F": 2, "LD": 3, "LF": 4,
+            "DF": 5, "LDF": 6, "GD": 7, "GL": 8, "GDL": 9}
 df["FM_enc"] = df["FM"].map(fm_order).fillna(
     df["FM"].astype("category").cat.codes)
 
@@ -92,17 +93,12 @@ for c in df.select_dtypes(include=np.number).columns:
     df[c].fillna(df[c].median(), inplace=True)
 
 FEATURES = [
-    # Core DSM parameters
     "λc", "λ(le-d)", "KL_r",
-    # Geometry ratios
     "h_t", "b_t", "L_h", "L_t", "h_b",
-    # Normalised strengths
     "Pcrl_Py", "Pne_Py",
-    # Polynomial / interaction features
     "λc_sq", "λled_sq", "λc_λled", "Pcrl_λled",
-    "KL_λc",  "λc_Pne",  "λled_Pcrl",
+    "KL_λc", "λc_Pne", "λled_Pcrl",
     "Pne_Pcrl", "λc3", "λled3",
-    # Target-encoded categoricals
     "section_target_enc", "bc_target_enc", "FM_enc",
 ]
 
@@ -128,23 +124,26 @@ for col, grp in [("section_target_enc", "Section Types"),
 
 print("✅  Target encoding recomputed on train-only (no leakage)")
 
-# ── CELL 5 ── Hyperparameters (5 000 trees, slow-LR for max accuracy) ─────────
+# ── CELL 5 ── Hyperparameters ──────────────────────────────────────────────────
+# NOTE: early_stopping_rounds is passed to the CONSTRUCTOR in XGBoost ≥ 2.0
 PARAMS_XGB = dict(
-    n_estimators=5000, learning_rate=0.008, max_depth=6,
-    subsample=0.85,    colsample_bytree=0.70,
-    min_child_weight=2, reg_alpha=0.3, reg_lambda=1.5,
-    random_state=42,   n_jobs=-1, verbosity=0
+    n_estimators=5000,       learning_rate=0.008,   max_depth=6,
+    subsample=0.85,          colsample_bytree=0.70,
+    min_child_weight=2,      reg_alpha=0.3,         reg_lambda=1.5,
+    early_stopping_rounds=150,                       # ← constructor, not fit()
+    random_state=42,         n_jobs=-1,             verbosity=0
 )
 PARAMS_LGB = dict(
-    n_estimators=5000, learning_rate=0.008, num_leaves=255,
-    subsample=0.85,    colsample_bytree=0.70,
-    reg_alpha=0.3,     reg_lambda=1.5, min_child_samples=8,
-    random_state=42,   n_jobs=-1, verbose=-1
+    n_estimators=5000,       learning_rate=0.008,   num_leaves=255,
+    subsample=0.85,          colsample_bytree=0.70,
+    reg_alpha=0.3,           reg_lambda=1.5,        min_child_samples=8,
+    random_state=42,         n_jobs=-1,             verbose=-1
 )
 PARAMS_CAT = dict(
-    iterations=5000, learning_rate=0.008, depth=8,
-    l2_leaf_reg=3.0,  subsample=0.85,
-    random_seed=42,   verbose=0
+    iterations=5000,         learning_rate=0.008,   depth=8,
+    l2_leaf_reg=3.0,         subsample=0.85,
+    early_stopping_rounds=150,
+    random_seed=42,          verbose=0
 )
 print("✅  Hyperparameters ready  (5 000 trees @ lr=0.008)")
 
@@ -157,36 +156,30 @@ X_tr_np = X_tr.values
 y_tr_np = y_tr.values
 X_te_np = X_te.values
 
+# LightGBM early-stopping callbacks (new API ≥ 4.0)
+lgb_callbacks = [lgb_lib.early_stopping(150, verbose=False),
+                 lgb_lib.log_evaluation(-1)]
+
 print("\n10-Fold OOF Stacking  (5 000 trees each — please wait) …")
 for fold, (tri, vai) in enumerate(kf.split(X_tr_np), 1):
     Xf, Xv = X_tr_np[tri], X_tr_np[vai]
     yf, yv = y_tr_np[tri], y_tr_np[vai]
 
-    # XGBoost
+    # XGBoost — early_stopping_rounds already in constructor
     m = XGBRegressor(**PARAMS_XGB)
-    m.fit(Xf, yf,
-          eval_set=[(Xv, yv)], verbose=False,
-          early_stopping_rounds=150)
+    m.fit(Xf, yf, eval_set=[(Xv, yv)], verbose=False)
     oof["xgb"][vai]  = m.predict(Xv)
     pred_te["xgb"]  += m.predict(X_te_np) / N_FOLDS
 
-    # LightGBM  (callbacks for early stopping in new API)
-    import lightgbm as lgb_lib
-    cb = [lgb_lib.early_stopping(150, verbose=False),
-          lgb_lib.log_evaluation(-1)]
+    # LightGBM — callbacks handle early stopping
     m = LGBMRegressor(**PARAMS_LGB)
-    m.fit(Xf, yf,
-          eval_set=[(Xv, yv)],
-          callbacks=cb)
+    m.fit(Xf, yf, eval_set=[(Xv, yv)], callbacks=lgb_callbacks)
     oof["lgb"][vai]  = m.predict(Xv)
     pred_te["lgb"]  += m.predict(X_te_np) / N_FOLDS
 
-    # CatBoost
+    # CatBoost — early_stopping_rounds in constructor
     m = CatBoostRegressor(**PARAMS_CAT)
-    m.fit(Xf, yf,
-          eval_set=(Xv, yv),
-          early_stopping_rounds=150,
-          verbose=False)
+    m.fit(Xf, yf, eval_set=(Xv, yv), verbose=False)
     oof["cat"][vai]  = m.predict(Xv)
     pred_te["cat"]  += m.predict(X_te_np) / N_FOLDS
 
@@ -208,7 +201,7 @@ oof_res_pred  = res_model.predict(X_tr_np)
 test_res_pred = res_model.predict(X_te_np)
 print(f"\nResidual model  train R²={r2_score(oof_resid, oof_res_pred):.4f}")
 
-# ── CELL 8 ── MLP Meta-Learner  (BUG-FIXED) ───────────────────────────────────
+# ── CELL 8 ── MLP Meta-Learner (FIXED) ────────────────────────────────────────
 S_tr    = np.column_stack([oof["xgb"],     oof["lgb"],     oof["cat"],
                             oof_res_pred])
 S_te    = np.column_stack([pred_te["xgb"], pred_te["lgb"], pred_te["cat"],
@@ -222,29 +215,26 @@ mlp = MLPRegressor(
     activation="relu",  solver="adam",
     learning_rate_init=0.0005,
     max_iter=5000,
-    # ── FIX: n_iter_no_change must be set when early_stopping=True ──
     early_stopping=True,
     validation_fraction=0.10,
-    n_iter_no_change=50,          # ← FIXED: was missing → caused best_loss_=None
+    n_iter_no_change=50,       # ← FIXED: required for best_loss_ to be set
     tol=1e-6,
     random_state=42,
     verbose=False
 )
 mlp.fit(S_tr_sc, y_tr_np)
-
 y_pred_tr_mlp = mlp.predict(S_tr_sc)
 y_pred_te_mlp = mlp.predict(S_te_sc)
 
-# Safe print — handles edge-case where best_loss_ is still None
 best_loss_str = (f"{mlp.best_loss_:.6f}"
-                 if mlp.best_loss_ is not None else "N/A (converged)")
-print(f"MLP meta-learner  iters={mlp.n_iter_}  best_val_loss={best_loss_str}")
+                 if mlp.best_loss_ is not None else "converged (no early stop)")
+print(f"MLP  iters={mlp.n_iter_}  best_val_loss={best_loss_str}")
 
-# ── CELL 8b ── Weighted Ridge Blend (5 predictors → final answer) ─────────────
+# ── CELL 8b ── Ridge Weighted Blend ───────────────────────────────────────────
 B_tr = np.column_stack([
     oof["xgb"], oof["lgb"], oof["cat"],
-    oof_mean,                                # simple mean
-    y_pred_tr_mlp                            # MLP output
+    oof_mean,
+    y_pred_tr_mlp
 ])
 B_te = np.column_stack([
     pred_te["xgb"], pred_te["lgb"], pred_te["cat"],
@@ -276,7 +266,7 @@ def report(y_true, y_pred, Py_vals=None, label=""):
     print(f"  MAPE              = {mape:.3f} %")
     print(f"  Mean (Nu/Nu,pred) = {mu:.4f}")
     print(f"  COV               = {cov:.4f}")
-    print(f"\n  ── Benchmark Targets ──────────────────────────────")
+    print(f"\n  ── Benchmark Targets ──────────────────────────────────")
     print(f"  R²   > 0.981  →  {'✅' if r2   > 0.981  else '❌'}  ({r2:.4f})")
     print(f"  R²   > 0.994  →  {'✅' if r2   > 0.994  else '⚠️ '}  ({r2:.4f})")
     print(f"  MAPE < 5.0 %  →  {'✅' if mape < 5.0    else '❌'}  ({mape:.2f} %)")
@@ -309,7 +299,7 @@ ax.fill_between(lim, [x * .95 for x in lim], [x * 1.05 for x in lim],
                 alpha=0.10, color="green",  label="±5 %")
 ax.set_xlabel("Pt/Py  —  Experimental", fontsize=12)
 ax.set_ylabel("Pt/Py  —  Predicted",    fontsize=12)
-ax.set_title("CFS Built-up Columns — v3.1 Pipeline", fontsize=13)
+ax.set_title("CFS Built-up Columns — v3.2 Pipeline", fontsize=13)
 ax.legend(fontsize=9); ax.grid(alpha=0.25)
 
 ax = axes[1]
@@ -332,7 +322,12 @@ print("✅  v3_scatter_residuals.png saved")
 
 # ── CELL 11 ── SHAP Analysis ──────────────────────────────────────────────────
 print("\nRunning SHAP on XGBoost …")
-xgb_shap = XGBRegressor(**PARAMS_XGB)
+xgb_shap = XGBRegressor(
+    n_estimators=5000, learning_rate=0.008, max_depth=6,
+    subsample=0.85, colsample_bytree=0.70,
+    min_child_weight=2, reg_alpha=0.3, reg_lambda=1.5,
+    random_state=42, n_jobs=-1, verbosity=0
+)
 xgb_shap.fit(X_tr, y_tr)
 explainer = shap.TreeExplainer(xgb_shap)
 shap_vals = explainer.shap_values(X_te)
@@ -363,10 +358,10 @@ print(f"\n  → Top-4 for PySR: {importance.head(4)['Feature'].tolist()}")
 
 # ── CELL 12 ── Error by Failure Mode ──────────────────────────────────────────
 res_df = pd.DataFrame({
-    "FM":       FM_te,
-    "actual":   y_te.values,
-    "predicted":y_pred_te,
-    "abs_err_%":np.abs((y_te.values - y_pred_te) / y_te.values) * 100
+    "FM":        FM_te,
+    "actual":    y_te.values,
+    "predicted": y_pred_te,
+    "abs_err_%": np.abs((y_te.values - y_pred_te) / y_te.values) * 100
 })
 print("\nError breakdown by Failure Mode:")
 print(res_df.groupby("FM")["abs_err_%"]
@@ -382,11 +377,11 @@ out["Pt_kN_actual"]    = y_te.values * Py_te
 out["Pt_kN_predicted"] = y_pred_te   * Py_te
 out["abs_err_%"]       = res_df["abs_err_%"].values
 out["FM"]              = FM_te
-out.to_csv("v3_predictions.csv",      index=False)
+out.to_csv("v3_predictions.csv",       index=False)
 importance.to_csv("v3_shap_importance.csv", index=False)
 print("\n✅  v3_predictions.csv saved")
 print("✅  v3_shap_importance.csv saved")
 print("\n" + "=" * 57)
-print("  🎯  Pipeline v3.1 Complete")
+print("  🎯  Pipeline v3.2 Complete")
 print(f"  Final Test R² = {r2_te:.6f}")
 print("=" * 57)
