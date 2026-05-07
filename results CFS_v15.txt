@@ -1,0 +1,2035 @@
+6.4s 1 0.00s - Debugger warning: It seems that frozen modules are being used, which may
+6.4s 2 0.00s - make the debugger miss breakpoints. Please pass -Xfrozen_modules=off
+6.4s 3 0.00s - to python to disable frozen modules.
+6.4s 4 0.00s - Note: Debugging will proceed. Set PYDEVD_DISABLE_FILE_VALIDATION=1 to disable this validation.
+6.9s 5 0.00s - Debugger warning: It seems that frozen modules are being used, which may
+6.9s 6 0.00s - make the debugger miss breakpoints. Please pass -Xfrozen_modules=off
+6.9s 7 0.00s - to python to disable frozen modules.
+6.9s 8 0.00s - Note: Debugging will proceed. Set PYDEVD_DISABLE_FILE_VALIDATION=1 to disable this validation.
+18.8s 9 ====================================================================================================
+18.8s 10 CFS v16 Pareto-Legendary Official No-Fastener Framework
+18.8s 11 ====================================================================================================
+18.8s 12 {
+18.8s 13 "DATA_URL": "https://raw.githubusercontent.com/Dr-Yehia/Stability-book/main/CFS_Built-up_Columns_ML_Dataset.csv",
+18.8s 14 "OUTPUT_DIR": "/kaggle/working/cfs_v16_pareto_legendary_official",
+18.8s 15 "MODE": "strong",
+18.8s 16 "TEST_SIZE": 0.2,
+18.8s 17 "RANDOM_STATE": 42,
+18.8s 18 "INNER_FOLDS": 5,
+18.8s 19 "REPEATED_CV_FOLDS": 5,
+18.8s 20 "REPEATED_CV_REPEATS": 2,
+18.8s 21 "RUN_REPEATED_CV": true,
+18.8s 22 "RUN_FULL_STACK_REPEATED_CV": false,
+18.8s 23 "USE_DESIGN_GROUP_SPECIALISTS": true,
+18.8s 24 "USE_SLENDERNESS_REGIME_SPECIALISTS": true,
+18.8s 25 "MIN_SPECIALIST_ROWS": 55,
+18.8s 26 "MULTIOBJECTIVE_SAFETY_TARGET_UNSAFE": 48.0,
+18.8s 27 "CONFORMAL_ALPHA": 0.1,
+18.8s 28 "USE_TRUE_FM_IN_STRENGTH_MODEL": false,
+18.8s 29 "USE_FM_PROBABILITIES": true,
+18.8s 30 "USE_TARGET_ENCODING": true,
+18.8s 31 "USE_CALIBRATION": true,
+18.8s 32 "USE_RESIDUAL_CORRECTION": true,
+18.8s 33 "PRED_MIN": 0.02,
+18.8s 34 "PRED_MAX": 1.3,
+18.8s 35 "SAVE_MODELS": true,
+18.8s 36 "MAKE_PLOTS": true,
+18.8s 37 "MAKE_SHAP": true
+18.8s 38 }
+18.8s 39 
+18.8s 40 [LIBS]
+18.8s 41 XGBoost : True
+18.8s 42 LightGBM: True
+18.8s 43 CatBoost: True
+18.8s 44 SHAP    : True
+18.8s 45 [DATA] Downloading from GitHub:
+18.8s 46 https://raw.githubusercontent.com/Dr-Yehia/Stability-book/main/CFS_Built-up_Columns_ML_Dataset.csv
+18.8s 47 [DATA] Downloaded: /kaggle/working/cfs_v16_pareto_legendary_official/data/CFS_Built-up_Columns_ML_Dataset.csv (187.8 KB)
+19.0s 48 [DATA] Rows after cleaning: 1037
+19.0s 49 [DATA] Section types: 33 | FM labels: 7 | Families: 694
+19.0s 50 
+19.0s 51 [DATA SUMMARY]
+19.0s 52 Rows: 1037
+19.0s 53 Target Pt/Py:
+19.0s 54 count    1037.000000
+19.0s 55 mean        0.471196
+19.0s 56 std         0.181073
+19.0s 57 min         0.030000
+19.0s 58 25%         0.330000
+19.0s 59 50%         0.490000
+19.0s 60 75%         0.590000
+19.0s 61 max         1.090000
+19.0s 62 
+19.0s 63 Design groups:
+19.0s 64 SG_design
+19.0s 65 G5_C2C            312
+19.0s 66 G1_O2C            219
+19.0s 67 G6_Open           125
+19.0s 68 G4_HC             110
+19.0s 69 G2_O2U            104
+19.0s 70 G3_CUC             89
+19.0s 71 G7a_Closed_Box     78
+19.0s 72 
+19.0s 73 True FM labels are used only to train cross-fitted FM-probability model, not as direct strength features.
+19.0s 74 FM
+19.0s 75 LF     298
+19.0s 76 L      297
+19.0s 77 F      172
+19.0s 78 D       84
+19.0s 79 LD      78
+19.0s 80 LDF     76
+19.0s 81 DF      32
+19.0s 82 
+19.0s 83 [SPLIT]
+19.0s 84 Train: 829 | Test: 208
+19.0s 85 Test design group distribution:
+19.0s 86 SG_design
+19.0s 87 G5_C2C            62
+19.0s 88 G1_O2C            45
+19.0s 89 G6_Open           25
+19.0s 90 G4_HC             22
+19.0s 91 G2_O2U            21
+19.0s 92 G3_CUC            17
+19.0s 93 G7a_Closed_Box    16
+19.0s 94 
+19.0s 95 ====================================================================================================
+19.0s 96 HOLDOUT TRAINING
+19.0s 97 ====================================================================================================
+19.0s 98 
+19.0s 99 [FM PROB] Cross-fitting failure-mode probability model
+19.0s 100 [FM PROB] Classes: ['D', 'DF', 'F', 'L', 'LD', 'LDF', 'LF']
+37.0s 101 fold 1: acc=0.9036, balanced_acc=0.8880
+53.7s 102 fold 2: acc=0.8916, balanced_acc=0.8053
+70.7s 103 fold 3: acc=0.9096, balanced_acc=0.8531
+87.7s 104 fold 4: acc=0.8916, balanced_acc=0.7594
+105.7s 105 fold 5: acc=0.9030, balanced_acc=0.8194
+105.7s 106 
+105.7s 107 [EXPERT] BASE_MIN | base=base_min
+145.8s 108 fold 1/5: R2=0.88586
+187.1s 109 fold 2/5: R2=0.91416
+227.3s 110 fold 3/5: R2=0.90134
+267.4s 111 fold 4/5: R2=0.87053
+310.5s 112 fold 5/5: R2=0.86707
+310.5s 113 [EXPERT DONE] BASE_MIN: OOF_R2=0.894766
+310.5s 114 
+310.5s 115 [EXPERT] BASE_GLOBAL | base=base_global
+352.1s 116 fold 1/5: R2=0.91241
+393.7s 117 fold 2/5: R2=0.92165
+434.9s 118 fold 3/5: R2=0.92308
+474.8s 119 fold 4/5: R2=0.88686
+514.4s 120 fold 5/5: R2=0.88354
+514.4s 121 [EXPERT DONE] BASE_GLOBAL: OOF_R2=0.913019
+514.4s 122 
+514.4s 123 [EXPERT] BASE_LOCAL | base=base_local
+555.8s 124 fold 1/5: R2=0.92954
+596.7s 125 fold 2/5: R2=0.93898
+636.6s 126 fold 3/5: R2=0.93447
+677.5s 127 fold 4/5: R2=0.91614
+719.5s 128 fold 5/5: R2=0.89306
+719.5s 129 [EXPERT DONE] BASE_LOCAL: OOF_R2=0.926194
+719.5s 130 
+719.5s 131 [EXPERT] BASE_MEAN | base=base_mean
+760.4s 132 fold 1/5: R2=0.91866
+801.3s 133 fold 2/5: R2=0.93859
+842.2s 134 fold 3/5: R2=0.93858
+882.5s 135 fold 4/5: R2=0.90837
+922.7s 136 fold 5/5: R2=0.86879
+922.7s 137 [EXPERT DONE] BASE_MEAN: OOF_R2=0.921797
+922.7s 138 
+922.7s 139 [EXPERT] BASE_GEOM | base=base_geom
+962.4s 140 fold 1/5: R2=0.91584
+1003.1s 141 fold 2/5: R2=0.93559
+1043.8s 142 fold 3/5: R2=0.93662
+1083.6s 143 fold 4/5: R2=0.90440
+1124.9s 144 fold 5/5: R2=0.87795
+1124.9s 145 [EXPERT DONE] BASE_GEOM: OOF_R2=0.919346
+1124.9s 146 
+1124.9s 147 [EXPERT] BASE_PNE | base=base_pne
+1165.1s 148 fold 1/5: R2=0.91178
+1205.0s 149 fold 2/5: R2=0.92128
+1245.5s 150 fold 3/5: R2=0.92267
+1285.6s 151 fold 4/5: R2=0.88623
+1325.0s 152 fold 5/5: R2=0.88449
+1325.0s 153 [EXPERT DONE] BASE_PNE: OOF_R2=0.914282
+1325.0s 154 
+1325.0s 155 [EXPERT] BASE_PCRL | base=base_pcrl
+1365.5s 156 fold 1/5: R2=0.87451
+1407.4s 157 fold 2/5: R2=0.89517
+1447.0s 158 fold 3/5: R2=0.89595
+1487.3s 159 fold 4/5: R2=0.85910
+1527.1s 160 fold 5/5: R2=0.83299
+1527.1s 161 [EXPERT DONE] BASE_PCRL: OOF_R2=0.879183
+1527.1s 162 
+1527.1s 163 [SPECIALISTS] Design-group specialists
+1527.1s 164 
+1527.1s 165 [EXPERT] SG_SPECIALIST::G1_O2C | base=base_min
+1536.7s 166 fold 1/4: R2=0.86778
+1546.3s 167 fold 2/4: R2=0.90304
+1556.0s 168 fold 3/4: R2=0.91995
+1565.6s 169 fold 4/4: R2=0.86710
+1565.6s 170 [EXPERT DONE] SG_SPECIALIST::G1_O2C: OOF_R2=0.909132
+1565.6s 171 added SG specialist G1_O2C: train=174, test=45, local_OOF_R2=0.90913
+1565.6s 172 
+1565.6s 173 [EXPERT] SG_SPECIALIST::G2_O2U | base=base_min
+1569.9s 174 fold 1/3: R2=0.92309
+1574.2s 175 fold 2/3: R2=0.82767
+1578.6s 176 fold 3/3: R2=0.89968
+1578.6s 177 [EXPERT DONE] SG_SPECIALIST::G2_O2U: OOF_R2=0.892994
+1578.6s 178 added SG specialist G2_O2U: train=83, test=21, local_OOF_R2=0.89299
+1578.6s 179 
+1578.6s 180 [EXPERT] SG_SPECIALIST::G3_CUC | base=base_min
+1582.7s 181 fold 1/3: R2=0.94538
+1587.2s 182 fold 2/3: R2=0.96656
+1591.3s 183 fold 3/3: R2=0.91034
+1591.3s 184 [EXPERT DONE] SG_SPECIALIST::G3_CUC: OOF_R2=0.956615
+1591.3s 185 added SG specialist G3_CUC: train=72, test=17, local_OOF_R2=0.95662
+1591.3s 186 
+1591.3s 187 [EXPERT] SG_SPECIALIST::G4_HC | base=base_min
+1595.9s 188 fold 1/3: R2=0.95216
+1600.4s 189 fold 2/3: R2=0.92175
+1605.1s 190 fold 3/3: R2=0.92325
+1605.1s 191 [EXPERT DONE] SG_SPECIALIST::G4_HC: OOF_R2=0.966842
+1605.1s 192 added SG specialist G4_HC: train=88, test=22, local_OOF_R2=0.96684
+1605.1s 193 
+1605.1s 194 [EXPERT] SG_SPECIALIST::G5_C2C | base=base_min
+1618.3s 195 fold 1/5: R2=0.76942
+1631.5s 196 fold 2/5: R2=0.88170
+1645.1s 197 fold 3/5: R2=0.79482
+1658.2s 198 fold 4/5: R2=0.92044
+1671.3s 199 fold 5/5: R2=0.92095
+1671.3s 200 [EXPERT DONE] SG_SPECIALIST::G5_C2C: OOF_R2=0.871698
+1671.3s 201 added SG specialist G5_C2C: train=250, test=62, local_OOF_R2=0.87170
+1671.3s 202 
+1671.3s 203 [EXPERT] SG_SPECIALIST::G6_Open | base=base_min
+1676.2s 204 fold 1/3: R2=0.90384
+1681.2s 205 fold 2/3: R2=0.94141
+1686.2s 206 fold 3/3: R2=0.95001
+1686.2s 207 [EXPERT DONE] SG_SPECIALIST::G6_Open: OOF_R2=0.960961
+1686.2s 208 added SG specialist G6_Open: train=100, test=25, local_OOF_R2=0.96096
+1686.2s 209 
+1686.2s 210 [EXPERT] SG_SPECIALIST::G7a_Closed_Box | base=base_min
+1690.7s 211 fold 1/3: R2=0.76741
+1695.2s 212 fold 2/3: R2=0.78608
+1699.7s 213 fold 3/3: R2=0.73883
+1699.7s 214 [EXPERT DONE] SG_SPECIALIST::G7a_Closed_Box: OOF_R2=0.798396
+1699.7s 215 added SG specialist G7a_Closed_Box: train=62, test=16, local_OOF_R2=0.79840
+1699.7s 216 
+1699.7s 217 [SPECIALISTS] Slenderness-regime specialists
+1699.7s 218 
+1699.7s 219 [EXPERT] REGIME_SPECIALIST::short | base=base_mean
+1728.9s 220 fold 1/5: R2=0.93684
+1757.7s 221 fold 2/5: R2=0.93438
+1787.2s 222 fold 3/5: R2=0.89680
+1815.6s 223 fold 4/5: R2=0.93800
+1844.3s 224 fold 5/5: R2=0.94213
+1844.3s 225 [EXPERT DONE] REGIME_SPECIALIST::short: OOF_R2=0.939654
+1844.3s 226 added regime specialist short: train=417, test=114, local_OOF_R2=0.93965
+1844.3s 227 
+1844.3s 228 [EXPERT] REGIME_SPECIALIST::intermediate | base=base_mean
+1857.1s 229 fold 1/5: R2=0.81581
+1869.9s 230 fold 2/5: R2=0.90647
+1883.1s 231 fold 3/5: R2=0.89896
+1896.1s 232 fold 4/5: R2=0.81092
+1909.2s 233 fold 5/5: R2=0.76454
+1909.2s 234 [EXPERT DONE] REGIME_SPECIALIST::intermediate: OOF_R2=0.844418
+1909.2s 235 added regime specialist intermediate: train=218, test=56, local_OOF_R2=0.84442
+1909.2s 236 
+1909.2s 237 [EXPERT] REGIME_SPECIALIST::slender | base=base_mean
+1921.0s 238 fold 1/5: R2=0.70602
+1932.6s 239 fold 2/5: R2=0.73879
+1944.9s 240 fold 3/5: R2=0.80153
+1956.3s 241 fold 4/5: R2=0.85249
+1968.0s 242 fold 5/5: R2=0.80989
+1968.0s 243 [EXPERT DONE] REGIME_SPECIALIST::slender: OOF_R2=0.787105
+1968.0s 244 added regime specialist slender: train=194, test=38, local_OOF_R2=0.78711
+1968.0s 245 
+1968.0s 246 ==========================================================================================
+1968.0s 247 PARETO SELECTED STACK BEFORE CALIBRATION
+1968.0s 248 ==========================================================================================
+1968.0s 249 R2                                  : 0.933139
+1968.0s 250 RMSE                                : 0.046663
+1968.0s 251 MAE                                 : 0.030923
+1968.0s 252 MAPE_%                              : 7.233078
+1968.0s 253 Mean_Test_over_Pred                 : 1.013017
+1968.0s 254 COV_Test_over_Pred                  : 0.105777
+1968.0s 255 Unsafe_Overprediction_%             : 43.667069
+1968.0s 256 N                                   : 829
+1968.0s 257 ParetoScore                         : 0.888801
+1968.0s 258 RiskPenalty                         : 0.000000
+1968.0s 259 MeanBiasAbs                         : 0.013017
+1968.0s 260 
+1968.0s 261 [PARETO TOP 12 CANDIDATES]
+1968.0s 262 name  ParetoScore       R2     RMSE      MAE   MAPE_%  Unsafe_Overprediction_%  Mean_Test_over_Pred  COV_Test_over_Pred
+1968.0s 263 meta::ridgecv::conservative_0.985     0.888801 0.933139 0.046663 0.030923 7.233078                43.667069             1.013017            0.105777
+1968.0s 264 single::BASE_LOCAL     0.884687 0.926194 0.049027 0.031987 7.178070                48.612786             1.002640            0.104453
+1968.0s 265 meta::ridgecv     0.884231 0.934890 0.046048 0.030493 7.292327                53.437877             0.997822            0.105777
+1968.0s 266 meta::ridgecv::conservative_0.975     0.881435 0.930031 0.047736 0.031924 7.346188                37.032569             1.023407            0.105777
+1968.0s 267 meta::positive_linear::conservative_0.985     0.881070 0.926202 0.049024 0.032456 7.370923                44.149578             1.013119            0.108035
+1968.0s 268 avg::top3     0.878964 0.925316 0.049318 0.032319 7.411383                50.904704             1.001031            0.107658
+1968.0s 269 avg::top3::conservative_0.985     0.876204 0.922665 0.050185 0.033052 7.411709                41.616405             1.016275            0.107658
+1968.0s 270 weighted::top5_inv_rmse     0.875907 0.925783 0.049163 0.032800 8.033265                51.025332             0.999295            0.115393
+1968.0s 271 avg::top5     0.875272 0.925716 0.049186 0.032828 8.055709                51.266586             0.999265            0.115685
+1968.0s 272 meta::positive_linear     0.875107 0.927947 0.048441 0.032196 7.458379                54.161641             0.997922            0.108035
+1968.0s 273 meta::positive_linear::conservative_0.975     0.873755 0.923101 0.050044 0.033394 7.475818                37.997587             1.023510            0.108035
+1968.0s 274 weighted::top5_inv_rmse::conservative_0.985     0.873739 0.922899 0.050109 0.033497 8.014724                42.460796             1.014513            0.115393
+1968.0s 275 [CALIBRATION] used=False
+1968.0s 276 
+1968.0s 277 [RESIDUAL] Cross-fitted residual correction
+1984.7s 278 residual correction used=False | OOF score raw=0.888801, corr=0.865773 | R2 raw=0.933139, corr=0.915834
+1984.7s 279 
+1984.7s 280 ==========================================================================================
+1984.7s 281 FINAL HOLDOUT RESULT
+1984.7s 282 ==========================================================================================
+1984.7s 283 stage                               : pareto_selected_meta::ridgecv::conservative_0.985
+1984.7s 284 OOF_R2                              : 0.933139
+1984.7s 285 OOF_RMSE                            : 0.046663
+1984.7s 286 OOF_MAE                             : 0.030923
+1984.7s 287 OOF_MAPE_%                          : 7.233078
+1984.7s 288 OOF_Mean_Test_over_Pred             : 1.013017
+1984.7s 289 OOF_COV_Test_over_Pred              : 0.105777
+1984.7s 290 OOF_Unsafe_Overprediction_%         : 43.667069
+1984.7s 291 OOF_N                               : 829
+1984.7s 292 TEST_R2                             : 0.939900
+1984.7s 293 TEST_RMSE                           : 0.044875
+1984.7s 294 TEST_MAE                            : 0.028352
+1984.7s 295 TEST_MAPE_%                         : 6.754987
+1984.7s 296 TEST_Mean_Test_over_Pred            : 1.022233
+1984.7s 297 TEST_COV_Test_over_Pred             : 0.111322
+1984.7s 298 TEST_Unsafe_Overprediction_%        : 40.865385
+1984.7s 299 TEST_N                              : 208
+1984.7s 300 
+1984.7s 301 [CONFORMAL] alpha=0.1, absolute q=0.071763, holdout coverage=91.35%
+1984.7s 302 
+1984.7s 303 [ERROR BY DESIGN GROUP]
+1984.7s 304 mean  median     max  count
+1984.7s 305 SG_design
+1984.7s 306 G5_C2C          8.560   4.976  74.896     62
+1984.7s 307 G3_CUC          8.472   6.266  24.973     17
+1984.7s 308 G7a_Closed_Box  8.456   7.077  19.147     16
+1984.7s 309 G6_Open         7.216   3.264  28.711     25
+1984.7s 310 G1_O2C          5.181   2.796  19.622     45
+1984.7s 311 G2_O2U          4.322   4.836  11.636     21
+1984.7s 312 G4_HC           4.122   3.067  14.124     22
+1984.7s 313 
+1984.7s 314 [ERROR BY TRUE FM — AUDIT ONLY, NOT DIRECT INPUT]
+1984.7s 315 mean  median     max  count
+1984.7s 316 FM_true_not_directly_used
+1984.7s 317 F                          15.503   8.579  74.896     23
+1984.7s 318 LDF                        11.157   9.681  28.711     13
+1984.7s 319 LF                          7.002   5.052  24.973     60
+1984.7s 320 DF                          5.900   2.584  14.599      8
+1984.7s 321 LD                          5.579   3.941  17.624     14
+1984.7s 322 L                           4.590   3.432  19.147     73
+1984.7s 323 D                           1.347   1.321   3.264     17
+1984.7s 324 
+1984.7s 325 [REPEATED CV] Stability check
+1984.7s 326 
+1984.7s 327 --------------------------------------------------------------------------------
+1984.7s 328 CV fold 1
+1984.7s 329 --------------------------------------------------------------------------------
+1984.7s 330 
+1984.7s 331 [FM PROB] Cross-fitting failure-mode probability model
+1984.7s 332 [FM PROB] Classes: ['D', 'DF', 'F', 'L', 'LD', 'LDF', 'LF']
+1999.7s 333 fold 1: acc=0.8881, balanced_acc=0.8490
+2015.2s 334 fold 2: acc=0.9058, balanced_acc=0.8609
+2030.4s 335 fold 3: acc=0.8732, balanced_acc=0.8221
+2030.4s 336 
+2030.4s 337 [EXPERT] BASE_MIN | base=base_min
+2067.4s 338 fold 1/3: R2=0.86045
+2105.2s 339 fold 2/3: R2=0.88388
+2142.0s 340 fold 3/3: R2=0.89415
+2142.0s 341 [EXPERT DONE] BASE_MIN: OOF_R2=0.893855
+2142.0s 342 
+2142.0s 343 [EXPERT] BASE_GLOBAL | base=base_global
+2179.2s 344 fold 1/3: R2=0.89750
+2219.2s 345 fold 2/3: R2=0.90063
+2255.7s 346 fold 3/3: R2=0.91642
+2255.7s 347 [EXPERT DONE] BASE_GLOBAL: OOF_R2=0.916706
+2255.7s 348 
+2255.7s 349 [EXPERT] BASE_LOCAL | base=base_local
+2293.8s 350 fold 1/3: R2=0.91291
+2331.3s 351 fold 2/3: R2=0.90872
+2368.9s 352 fold 3/3: R2=0.93342
+2368.9s 353 [EXPERT DONE] BASE_LOCAL: OOF_R2=0.930630
+2368.9s 354 
+2368.9s 355 [EXPERT] BASE_MEAN | base=base_mean
+2407.6s 356 fold 1/3: R2=0.89740
+2445.2s 357 fold 2/3: R2=0.90967
+2483.7s 358 fold 3/3: R2=0.92778
+2483.7s 359 [EXPERT DONE] BASE_MEAN: OOF_R2=0.921941
+2483.7s 360 
+2483.7s 361 [EXPERT] BASE_GEOM | base=base_geom
+2520.4s 362 fold 1/3: R2=0.90568
+2557.6s 363 fold 2/3: R2=0.90848
+2594.4s 364 fold 3/3: R2=0.92763
+2594.4s 365 [EXPERT DONE] BASE_GEOM: OOF_R2=0.925038
+2594.4s 366 
+2594.4s 367 [EXPERT] BASE_PNE | base=base_pne
+2631.2s 368 fold 1/3: R2=0.89771
+2669.0s 369 fold 2/3: R2=0.90110
+2706.0s 370 fold 3/3: R2=0.91671
+2706.0s 371 [EXPERT DONE] BASE_PNE: OOF_R2=0.915940
+2706.0s 372 
+2706.0s 373 [EXPERT] BASE_PCRL | base=base_pcrl
+2743.6s 374 fold 1/3: R2=0.83650
+2780.6s 375 fold 2/3: R2=0.87777
+2818.1s 376 fold 3/3: R2=0.89127
+2818.1s 377 [EXPERT DONE] BASE_PCRL: OOF_R2=0.876656
+2818.1s 378 
+2818.1s 379 [SPECIALISTS] Design-group specialists
+2818.1s 380 
+2818.1s 381 [EXPERT] SG_SPECIALIST::G1_O2C | base=base_min
+2827.1s 382 fold 1/3: R2=0.87890
+2836.3s 383 fold 2/3: R2=0.80333
+2845.4s 384 fold 3/3: R2=0.88759
+2845.4s 385 [EXPERT DONE] SG_SPECIALIST::G1_O2C: OOF_R2=0.879401
+2845.4s 386 added SG specialist G1_O2C: train=178, test=41, local_OOF_R2=0.87940
+2845.4s 387 
+2845.4s 388 [EXPERT] SG_SPECIALIST::G2_O2U | base=base_min
+2849.8s 389 fold 1/3: R2=0.89232
+2854.5s 390 fold 2/3: R2=0.89947
+2858.9s 391 fold 3/3: R2=0.90843
+2858.9s 392 [EXPERT DONE] SG_SPECIALIST::G2_O2U: OOF_R2=0.912993
+2858.9s 393 added SG specialist G2_O2U: train=86, test=18, local_OOF_R2=0.91299
+2858.9s 394 
+2858.9s 395 [EXPERT] SG_SPECIALIST::G3_CUC | base=base_min
+2863.2s 396 fold 1/3: R2=0.95552
+2867.3s 397 fold 2/3: R2=0.89011
+2871.6s 398 fold 3/3: R2=0.93238
+2871.6s 399 [EXPERT DONE] SG_SPECIALIST::G3_CUC: OOF_R2=0.953837
+2871.6s 400 added SG specialist G3_CUC: train=71, test=18, local_OOF_R2=0.95384
+2871.6s 401 
+2871.6s 402 [EXPERT] SG_SPECIALIST::G4_HC | base=base_min
+2876.2s 403 fold 1/3: R2=0.97074
+2880.9s 404 fold 2/3: R2=0.95872
+2885.5s 405 fold 3/3: R2=0.92987
+2885.5s 406 [EXPERT DONE] SG_SPECIALIST::G4_HC: OOF_R2=0.978221
+2885.5s 407 added SG specialist G4_HC: train=90, test=20, local_OOF_R2=0.97822
+2885.5s 408 
+2885.5s 409 [EXPERT] SG_SPECIALIST::G5_C2C | base=base_min
+2897.0s 410 fold 1/3: R2=0.77393
+2908.6s 411 fold 2/3: R2=0.76133
+2920.2s 412 fold 3/3: R2=0.80506
+2920.2s 413 [EXPERT DONE] SG_SPECIALIST::G5_C2C: OOF_R2=0.796137
+2920.2s 414 added SG specialist G5_C2C: train=243, test=69, local_OOF_R2=0.79614
+2920.2s 415 
+2920.2s 416 [EXPERT] SG_SPECIALIST::G6_Open | base=base_min
+2925.2s 417 fold 1/3: R2=0.94551
+2930.1s 418 fold 2/3: R2=0.85640
+2935.1s 419 fold 3/3: R2=0.93727
+2935.1s 420 [EXPERT DONE] SG_SPECIALIST::G6_Open: OOF_R2=0.934517
+2935.1s 421 added SG specialist G6_Open: train=101, test=24, local_OOF_R2=0.93452
+2935.1s 422 
+2935.1s 423 [EXPERT] SG_SPECIALIST::G7a_Closed_Box | base=base_min
+2939.7s 424 fold 1/3: R2=0.84218
+2944.2s 425 fold 2/3: R2=0.81709
+2948.4s 426 fold 3/3: R2=0.44041
+2948.4s 427 [EXPERT DONE] SG_SPECIALIST::G7a_Closed_Box: OOF_R2=0.703883
+2948.4s 428 added SG specialist G7a_Closed_Box: train=60, test=18, local_OOF_R2=0.70388
+2948.4s 429 
+2948.4s 430 [SPECIALISTS] Slenderness-regime specialists
+2948.4s 431 
+2948.4s 432 [EXPERT] REGIME_SPECIALIST::short | base=base_mean
+2974.7s 433 fold 1/3: R2=0.91259
+3001.3s 434 fold 2/3: R2=0.93789
+3026.8s 435 fold 3/3: R2=0.90713
+3026.8s 436 [EXPERT DONE] REGIME_SPECIALIST::short: OOF_R2=0.929145
+3026.8s 437 added regime specialist short: train=418, test=113, local_OOF_R2=0.92915
+3026.8s 438 
+3026.8s 439 [EXPERT] REGIME_SPECIALIST::intermediate | base=base_mean
+3038.1s 440 fold 1/3: R2=0.90300
+3049.8s 441 fold 2/3: R2=0.82216
+3060.9s 442 fold 3/3: R2=0.82119
+3060.9s 443 [EXPERT DONE] REGIME_SPECIALIST::intermediate: OOF_R2=0.851244
+3060.9s 444 added regime specialist intermediate: train=218, test=56, local_OOF_R2=0.85124
+3060.9s 445 
+3060.9s 446 [EXPERT] REGIME_SPECIALIST::slender | base=base_mean
+3071.2s 447 fold 1/3: R2=0.73154
+3081.4s 448 fold 2/3: R2=0.81166
+3091.6s 449 fold 3/3: R2=0.55014
+3091.6s 450 [EXPERT DONE] REGIME_SPECIALIST::slender: OOF_R2=0.748698
+3091.6s 451 added regime specialist slender: train=193, test=39, local_OOF_R2=0.74870
+3091.6s 452 
+3091.6s 453 ==========================================================================================
+3091.6s 454 PARETO SELECTED STACK BEFORE CALIBRATION
+3091.6s 455 ==========================================================================================
+3091.6s 456 R2                                  : 0.938398
+3091.6s 457 RMSE                                : 0.044919
+3091.6s 458 MAE                                 : 0.029370
+3091.6s 459 MAPE_%                              : 6.564886
+3091.6s 460 Mean_Test_over_Pred                 : 1.014618
+3091.6s 461 COV_Test_over_Pred                  : 0.095352
+3091.6s 462 Unsafe_Overprediction_%             : 42.943305
+3091.6s 463 N                                   : 829
+3091.6s 464 ParetoScore                         : 0.897175
+3091.6s 465 RiskPenalty                         : 0.000000
+3091.6s 466 MeanBiasAbs                         : 0.014618
+3091.6s 467 
+3091.6s 468 [PARETO TOP 12 CANDIDATES]
+3091.6s 469 name  ParetoScore       R2     RMSE      MAE   MAPE_%  Unsafe_Overprediction_%  Mean_Test_over_Pred  COV_Test_over_Pred
+3091.6s 470 meta::ridgecv::conservative_0.985     0.897175 0.938398 0.044919 0.029370 6.564886                42.943305             1.014618            0.095352
+3091.6s 471 meta::ridgecv     0.891686 0.940124 0.044285 0.029148 6.633572                54.523522             0.999398            0.095352
+3091.6s 472 meta::ridgecv::conservative_0.975     0.889624 0.935342 0.046019 0.030491 6.719831                35.464415             1.025024            0.095352
+3091.6s 473 meta::positive_linear::conservative_0.985     0.887311 0.931087 0.047509 0.030963 7.123728                44.028951             1.013131            0.106569
+3091.6s 474 single::BASE_LOCAL     0.884645 0.930630 0.047666 0.030688 7.102491                51.387214             1.002357            0.106626
+3091.6s 475 avg::top3::conservative_0.985     0.881979 0.927079 0.048871 0.031489 7.192802                41.978287             1.015830            0.109525
+3091.6s 476 meta::positive_linear     0.880446 0.932801 0.046915 0.030735 7.213058                54.644150             0.997934            0.106569
+3091.6s 477 avg::top3     0.880164 0.929412 0.048083 0.030965 7.215858                53.196622             1.000592            0.109525
+3091.6s 478 meta::positive_linear::conservative_0.975     0.879892 0.928041 0.048548 0.032052 7.257648                36.429433             1.023522            0.106569
+3091.6s 479 avg::top7     0.878153 0.928656 0.048340 0.032182 8.221970                50.904704             1.000154            0.118861
+3091.6s 480 single::BASE_GEOM     0.875424 0.925038 0.049551 0.031734 6.926133                53.437877             1.004949            0.107106
+3091.6s 481 avg::top7::conservative_0.985     0.875127 0.925634 0.049353 0.032828 8.204077                41.013269             1.015385            0.118861
+3091.6s 482 [CALIBRATION] used=False
+3091.6s 483 CV fold 1: R2=0.92615, RMSE=0.04902, MAPE=6.958%
+3091.6s 484 
+3091.6s 485 --------------------------------------------------------------------------------
+3091.6s 486 CV fold 2
+3091.6s 487 --------------------------------------------------------------------------------
+3091.6s 488 
+3091.6s 489 [FM PROB] Cross-fitting failure-mode probability model
+3091.6s 490 [FM PROB] Classes: ['D', 'DF', 'F', 'L', 'LD', 'LDF', 'LF']
+3106.7s 491 fold 1: acc=0.8881, balanced_acc=0.8219
+3122.1s 492 fold 2: acc=0.8986, balanced_acc=0.8171
+3138.6s 493 fold 3: acc=0.9022, balanced_acc=0.8335
+3138.6s 494 
+3138.6s 495 [EXPERT] BASE_MIN | base=base_min
+3177.1s 496 fold 1/3: R2=0.86067
+3215.0s 497 fold 2/3: R2=0.88518
+3253.4s 498 fold 3/3: R2=0.85799
+3253.4s 499 [EXPERT DONE] BASE_MIN: OOF_R2=0.874297
+3253.4s 500 
+3253.4s 501 [EXPERT] BASE_GLOBAL | base=base_global
+3292.1s 502 fold 1/3: R2=0.88101
+3329.8s 503 fold 2/3: R2=0.90647
+3367.4s 504 fold 3/3: R2=0.87935
+3367.4s 505 [EXPERT DONE] BASE_GLOBAL: OOF_R2=0.894375
+3367.4s 506 
+3367.4s 507 [EXPERT] BASE_LOCAL | base=base_local
+3406.0s 508 fold 1/3: R2=0.89479
+3444.4s 509 fold 2/3: R2=0.91184
+3485.0s 510 fold 3/3: R2=0.89642
+3485.0s 511 [EXPERT DONE] BASE_LOCAL: OOF_R2=0.903176
+3485.0s 512 
+3485.0s 513 [EXPERT] BASE_MEAN | base=base_mean
+3523.8s 514 fold 1/3: R2=0.89297
+3562.7s 515 fold 2/3: R2=0.90719
+3600.9s 516 fold 3/3: R2=0.88789
+3600.9s 517 [EXPERT DONE] BASE_MEAN: OOF_R2=0.898195
+3600.9s 518 
+3600.9s 519 [EXPERT] BASE_GEOM | base=base_geom
+3640.9s 520 fold 1/3: R2=0.89117
+3679.4s 521 fold 2/3: R2=0.90173
+3717.0s 522 fold 3/3: R2=0.88460
+3717.0s 523 [EXPERT DONE] BASE_GEOM: OOF_R2=0.894624
+3717.0s 524 
+3717.0s 525 [EXPERT] BASE_PNE | base=base_pne
+3756.0s 526 fold 1/3: R2=0.88008
+3795.1s 527 fold 2/3: R2=0.90747
+3834.6s 528 fold 3/3: R2=0.87927
+3834.6s 529 [EXPERT DONE] BASE_PNE: OOF_R2=0.892999
+3834.6s 530 
+3834.6s 531 [EXPERT] BASE_PCRL | base=base_pcrl
+3873.6s 532 fold 1/3: R2=0.84425
+3912.5s 533 fold 2/3: R2=0.86814
+3950.7s 534 fold 3/3: R2=0.84128
+3950.7s 535 [EXPERT DONE] BASE_PCRL: OOF_R2=0.863049
+3950.7s 536 
+3950.7s 537 [SPECIALISTS] Design-group specialists
+3950.7s 538 
+3950.7s 539 [EXPERT] SG_SPECIALIST::G1_O2C | base=base_min
+3959.8s 540 fold 1/3: R2=0.90507
+3969.0s 541 fold 2/3: R2=0.92153
+3977.9s 542 fold 3/3: R2=0.86755
+3977.9s 543 [EXPERT DONE] SG_SPECIALIST::G1_O2C: OOF_R2=0.918696
+3977.9s 544 added SG specialist G1_O2C: train=175, test=44, local_OOF_R2=0.91870
+3977.9s 545 
+3977.9s 546 [EXPERT] SG_SPECIALIST::G2_O2U | base=base_min
+3982.4s 547 fold 1/3: R2=0.87897
+3987.0s 548 fold 2/3: R2=0.93715
+3991.6s 549 fold 3/3: R2=0.89970
+3991.6s 550 [EXPERT DONE] SG_SPECIALIST::G2_O2U: OOF_R2=0.932021
+3991.6s 551 added SG specialist G2_O2U: train=86, test=18, local_OOF_R2=0.93202
+3991.6s 552 
+3991.6s 553 [EXPERT] SG_SPECIALIST::G3_CUC | base=base_min
+3995.9s 554 fold 1/3: R2=0.93674
+4000.2s 555 fold 2/3: R2=0.96885
+4004.6s 556 fold 3/3: R2=0.91989
+4004.6s 557 [EXPERT DONE] SG_SPECIALIST::G3_CUC: OOF_R2=0.961987
+4004.6s 558 added SG specialist G3_CUC: train=67, test=22, local_OOF_R2=0.96199
+4004.6s 559 
+4004.6s 560 [EXPERT] SG_SPECIALIST::G4_HC | base=base_min
+4009.5s 561 fold 1/3: R2=0.96698
+4014.8s 562 fold 2/3: R2=0.97558
+4019.6s 563 fold 3/3: R2=0.93703
+4019.6s 564 [EXPERT DONE] SG_SPECIALIST::G4_HC: OOF_R2=0.973681
+4019.6s 565 added SG specialist G4_HC: train=89, test=21, local_OOF_R2=0.97368
+4019.6s 566 
+4019.6s 567 [EXPERT] SG_SPECIALIST::G5_C2C | base=base_min
+4031.7s 568 fold 1/3: R2=0.79379
+4043.8s 569 fold 2/3: R2=0.90618
+4056.2s 570 fold 3/3: R2=0.84584
+4056.2s 571 [EXPERT DONE] SG_SPECIALIST::G5_C2C: OOF_R2=0.853790
+4056.2s 572 added SG specialist G5_C2C: train=252, test=60, local_OOF_R2=0.85379
+4056.2s 573 
+4056.2s 574 [EXPERT] SG_SPECIALIST::G6_Open | base=base_min
+4061.2s 575 fold 1/3: R2=0.90288
+4066.0s 576 fold 2/3: R2=0.80710
+4071.0s 577 fold 3/3: R2=0.95929
+4071.0s 578 [EXPERT DONE] SG_SPECIALIST::G6_Open: OOF_R2=0.909285
+4071.0s 579 added SG specialist G6_Open: train=89, test=36, local_OOF_R2=0.90928
+4071.0s 580 
+4071.0s 581 [EXPERT] SG_SPECIALIST::G7a_Closed_Box | base=base_min
+4075.9s 582 fold 1/3: R2=0.69642
+4080.4s 583 fold 2/3: R2=0.76607
+4085.2s 584 fold 3/3: R2=0.68144
+4085.2s 585 [EXPERT DONE] SG_SPECIALIST::G7a_Closed_Box: OOF_R2=0.741520
+4085.2s 586 added SG specialist G7a_Closed_Box: train=71, test=7, local_OOF_R2=0.74152
+4085.2s 587 
+4085.2s 588 [SPECIALISTS] Slenderness-regime specialists
+4085.2s 589 
+4085.2s 590 [EXPERT] REGIME_SPECIALIST::short | base=base_mean
+4112.6s 591 fold 1/3: R2=0.89872
+4138.9s 592 fold 2/3: R2=0.89786
+4165.0s 593 fold 3/3: R2=0.92296
+4165.0s 594 [EXPERT DONE] REGIME_SPECIALIST::short: OOF_R2=0.909700
+4165.0s 595 added regime specialist short: train=415, test=116, local_OOF_R2=0.90970
+4165.0s 596 
+4165.0s 597 [EXPERT] REGIME_SPECIALIST::intermediate | base=base_mean
+4176.6s 598 fold 1/3: R2=0.88613
+4188.4s 599 fold 2/3: R2=0.83996
+4200.1s 600 fold 3/3: R2=0.74248
+4200.1s 601 [EXPERT DONE] REGIME_SPECIALIST::intermediate: OOF_R2=0.854846
+4200.1s 602 added regime specialist intermediate: train=223, test=51, local_OOF_R2=0.85485
+4200.1s 603 
+4200.1s 604 [EXPERT] REGIME_SPECIALIST::slender | base=base_mean
+4210.4s 605 fold 1/3: R2=0.68714
+4220.1s 606 fold 2/3: R2=0.60139
+4230.6s 607 fold 3/3: R2=0.81042
+4230.6s 608 [EXPERT DONE] REGIME_SPECIALIST::slender: OOF_R2=0.756614
+4230.6s 609 added regime specialist slender: train=191, test=41, local_OOF_R2=0.75661
+4230.6s 610 
+4230.6s 611 ==========================================================================================
+4230.6s 612 PARETO SELECTED STACK BEFORE CALIBRATION
+4230.6s 613 ==========================================================================================
+4230.6s 614 R2                                  : 0.924949
+4230.6s 615 RMSE                                : 0.050161
+4230.6s 616 MAE                                 : 0.033399
+4230.6s 617 MAPE_%                              : 7.832404
+4230.6s 618 Mean_Test_over_Pred                 : 1.013745
+4230.6s 619 COV_Test_over_Pred                  : 0.113708
+4230.6s 620 Unsafe_Overprediction_%             : 42.943305
+4230.6s 621 N                                   : 829
+4230.6s 622 ParetoScore                         : 0.877060
+4230.6s 623 RiskPenalty                         : 0.000000
+4230.6s 624 MeanBiasAbs                         : 0.013745
+4230.6s 625 
+4230.6s 626 [PARETO TOP 12 CANDIDATES]
+4230.6s 627 name  ParetoScore       R2     RMSE      MAE   MAPE_%  Unsafe_Overprediction_%  Mean_Test_over_Pred  COV_Test_over_Pred
+4230.6s 628 meta::ridgecv::conservative_0.985     0.877060 0.924949 0.050161 0.033399 7.832404                42.943305             1.013745            0.113708
+4230.6s 629 meta::ridgecv     0.872726 0.926660 0.049586 0.032967 7.894077                53.558504             0.998539            0.113708
+4230.6s 630 meta::ridgecv::conservative_0.975     0.869764 0.921926 0.051161 0.034483 7.947681                38.118215             1.024142            0.113708
+4230.6s 631 meta::positive_linear::conservative_0.985     0.853993 0.904953 0.056449 0.036911 8.488947                46.079614             1.012200            0.125063
+4230.6s 632 single::BASE_LOCAL     0.850998 0.903176 0.056974 0.036852 8.372143                50.663450             1.003821            0.123897
+4230.6s 633 avg::top7     0.849645 0.903877 0.056767 0.037038 9.294770                49.577805             1.000771            0.133836
+4230.6s 634 avg::top3     0.847967 0.901589 0.057439 0.036723 8.454983                51.507841             1.002301            0.126763
+4230.6s 635 meta::positive_linear::conservative_0.975     0.847081 0.901948 0.057334 0.037718 8.538867                41.013269             1.022582            0.125063
+4230.6s 636 weighted::top10_inv_rmse     0.846611 0.902723 0.057107 0.037585 9.108290                50.422195             1.004733            0.133596
+4230.6s 637 avg::top3::conservative_0.985     0.846084 0.898556 0.058317 0.037408 8.422687                42.822678             1.017565            0.126763
+4230.6s 638 avg::top10     0.845690 0.902556 0.057156 0.037631 9.107873                50.784077             1.005032            0.133981
+4230.6s 639 avg::top7::conservative_0.985     0.843974 0.900606 0.057725 0.037815 9.277886                42.098914             1.016011            0.133836
+4230.6s 640 [CALIBRATION] used=True
+4230.6s 641 CV fold 2: R2=0.95113, RMSE=0.03809, MAPE=5.590%
+4230.6s 642 
+4230.6s 643 --------------------------------------------------------------------------------
+4230.6s 644 CV fold 3
+4230.6s 645 --------------------------------------------------------------------------------
+4230.6s 646 
+4230.6s 647 [FM PROB] Cross-fitting failure-mode probability model
+4230.6s 648 [FM PROB] Classes: ['D', 'DF', 'F', 'L', 'LD', 'LDF', 'LF']
+4245.5s 649 fold 1: acc=0.8989, balanced_acc=0.8633
+4260.3s 650 fold 2: acc=0.8953, balanced_acc=0.8318
+4275.4s 651 fold 3: acc=0.9094, balanced_acc=0.8576
+4275.4s 652 
+4275.4s 653 [EXPERT] BASE_MIN | base=base_min
+4313.5s 654 fold 1/3: R2=0.90914
+4351.1s 655 fold 2/3: R2=0.85627
+4390.7s 656 fold 3/3: R2=0.87245
+4390.7s 657 [EXPERT DONE] BASE_MIN: OOF_R2=0.888060
+4390.7s 658 
+4390.7s 659 [EXPERT] BASE_GLOBAL | base=base_global
+4429.2s 660 fold 1/3: R2=0.91742
+4466.4s 661 fold 2/3: R2=0.87710
+4504.7s 662 fold 3/3: R2=0.89989
+4504.7s 663 [EXPERT DONE] BASE_GLOBAL: OOF_R2=0.909380
+4504.7s 664 
+4504.7s 665 [EXPERT] BASE_LOCAL | base=base_local
+4544.6s 666 fold 1/3: R2=0.93425
+4584.3s 667 fold 2/3: R2=0.90042
+4621.5s 668 fold 3/3: R2=0.91158
+4621.5s 669 [EXPERT DONE] BASE_LOCAL: OOF_R2=0.924620
+4621.5s 670 
+4621.5s 671 [EXPERT] BASE_MEAN | base=base_mean
+4661.8s 672 fold 1/3: R2=0.93173
+4699.7s 673 fold 2/3: R2=0.88952
+4737.3s 674 fold 3/3: R2=0.89934
+4737.3s 675 [EXPERT DONE] BASE_MEAN: OOF_R2=0.913687
+4737.3s 676 
+4737.3s 677 [EXPERT] BASE_GEOM | base=base_geom
+4775.4s 678 fold 1/3: R2=0.93591
+4814.2s 679 fold 2/3: R2=0.89392
+4851.9s 680 fold 3/3: R2=0.90893
+4851.9s 681 [EXPERT DONE] BASE_GEOM: OOF_R2=0.918060
+4851.9s 682 
+4851.9s 683 [EXPERT] BASE_PNE | base=base_pne
+4890.0s 684 fold 1/3: R2=0.91676
+4927.9s 685 fold 2/3: R2=0.87676
+4965.9s 686 fold 3/3: R2=0.89761
+4965.9s 687 [EXPERT DONE] BASE_PNE: OOF_R2=0.907889
+4965.9s 688 
+4965.9s 689 [EXPERT] BASE_PCRL | base=base_pcrl
+5003.8s 690 fold 1/3: R2=0.89635
+5042.6s 691 fold 2/3: R2=0.84368
+5080.7s 692 fold 3/3: R2=0.85352
+5080.7s 693 [EXPERT DONE] BASE_PCRL: OOF_R2=0.870465
+5080.7s 694 
+5080.7s 695 [SPECIALISTS] Design-group specialists
+5080.7s 696 
+5080.7s 697 [EXPERT] SG_SPECIALIST::G1_O2C | base=base_min
+5089.5s 698 fold 1/3: R2=0.82876
+5098.2s 699 fold 2/3: R2=0.89392
+5107.0s 700 fold 3/3: R2=0.91914
+5107.0s 701 [EXPERT DONE] SG_SPECIALIST::G1_O2C: OOF_R2=0.891082
+5107.0s 702 added SG specialist G1_O2C: train=175, test=44, local_OOF_R2=0.89108
+5107.0s 703 
+5107.0s 704 [EXPERT] SG_SPECIALIST::G2_O2U | base=base_min
+5111.2s 705 fold 1/3: R2=0.95846
+5115.6s 706 fold 2/3: R2=0.88018
+5120.0s 707 fold 3/3: R2=0.88956
+5120.0s 708 [EXPERT DONE] SG_SPECIALIST::G2_O2U: OOF_R2=0.912436
+5120.0s 709 added SG specialist G2_O2U: train=83, test=21, local_OOF_R2=0.91244
+5120.0s 710 
+5120.0s 711 [EXPERT] SG_SPECIALIST::G3_CUC | base=base_min
+5124.4s 712 fold 1/3: R2=0.91335
+5128.6s 713 fold 2/3: R2=0.95072
+5133.0s 714 fold 3/3: R2=0.97320
+5133.0s 715 [EXPERT DONE] SG_SPECIALIST::G3_CUC: OOF_R2=0.952062
+5133.0s 716 added SG specialist G3_CUC: train=72, test=17, local_OOF_R2=0.95206
+5133.0s 717 
+5133.0s 718 [EXPERT] SG_SPECIALIST::G4_HC | base=base_min
+5137.8s 719 fold 1/3: R2=0.96331
+5142.5s 720 fold 2/3: R2=0.93444
+5147.1s 721 fold 3/3: R2=0.96600
+5147.1s 722 [EXPERT DONE] SG_SPECIALIST::G4_HC: OOF_R2=0.966418
+5147.1s 723 added SG specialist G4_HC: train=87, test=23, local_OOF_R2=0.96642
+5147.1s 724 
+5147.1s 725 [EXPERT] SG_SPECIALIST::G5_C2C | base=base_min
+5158.6s 726 fold 1/3: R2=0.78809
+5170.2s 727 fold 2/3: R2=0.80658
+5181.8s 728 fold 3/3: R2=0.80092
+5181.8s 729 [EXPERT DONE] SG_SPECIALIST::G5_C2C: OOF_R2=0.812669
+5181.8s 730 added SG specialist G5_C2C: train=249, test=63, local_OOF_R2=0.81267
+5181.8s 731 
+5181.8s 732 [EXPERT] SG_SPECIALIST::G6_Open | base=base_min
+5187.1s 733 fold 1/3: R2=0.96697
+5192.1s 734 fold 2/3: R2=0.93398
+5197.3s 735 fold 3/3: R2=0.96853
+5197.3s 736 [EXPERT DONE] SG_SPECIALIST::G6_Open: OOF_R2=0.969113
+5197.3s 737 added SG specialist G6_Open: train=108, test=17, local_OOF_R2=0.96911
+5197.3s 738 
+5197.3s 739 [EXPERT] SG_SPECIALIST::G7a_Closed_Box | base=base_min
+5201.7s 740 fold 1/3: R2=0.76142
+5206.1s 741 fold 2/3: R2=0.71303
+5210.3s 742 fold 3/3: R2=0.35668
+5210.3s 743 [EXPERT DONE] SG_SPECIALIST::G7a_Closed_Box: OOF_R2=0.669282
+5210.3s 744 added SG specialist G7a_Closed_Box: train=56, test=22, local_OOF_R2=0.66928
+5210.3s 745 
+5210.3s 746 [SPECIALISTS] Slenderness-regime specialists
+5210.3s 747 
+5210.3s 748 [EXPERT] REGIME_SPECIALIST::short | base=base_mean
+5236.7s 749 fold 1/3: R2=0.92509
+5263.7s 750 fold 2/3: R2=0.91786
+5291.8s 751 fold 3/3: R2=0.93149
+5291.8s 752 [EXPERT DONE] REGIME_SPECIALIST::short: OOF_R2=0.927968
+5291.8s 753 added regime specialist short: train=430, test=101, local_OOF_R2=0.92797
+5291.8s 754 
+5291.8s 755 [EXPERT] REGIME_SPECIALIST::intermediate | base=base_mean
+5303.5s 756 fold 1/3: R2=0.78669
+5314.6s 757 fold 2/3: R2=0.84998
+5325.8s 758 fold 3/3: R2=0.83875
+5325.8s 759 [EXPERT DONE] REGIME_SPECIALIST::intermediate: OOF_R2=0.847300
+5325.8s 760 added regime specialist intermediate: train=218, test=56, local_OOF_R2=0.84730
+5325.8s 761 
+5325.8s 762 [EXPERT] REGIME_SPECIALIST::slender | base=base_mean
+5336.0s 763 fold 1/3: R2=0.82170
+5345.6s 764 fold 2/3: R2=0.65429
+5354.8s 765 fold 3/3: R2=0.72501
+5354.8s 766 [EXPERT DONE] REGIME_SPECIALIST::slender: OOF_R2=0.737150
+5354.8s 767 added regime specialist slender: train=182, test=50, local_OOF_R2=0.73715
+5354.8s 768 
+5354.8s 769 ==========================================================================================
+5354.8s 770 PARETO SELECTED STACK BEFORE CALIBRATION
+5354.8s 771 ==========================================================================================
+5354.8s 772 R2                                  : 0.932275
+5354.8s 773 RMSE                                : 0.046964
+5354.8s 774 MAE                                 : 0.030942
+5354.8s 775 MAPE_%                              : 7.074554
+5354.8s 776 Mean_Test_over_Pred                 : 1.014804
+5354.8s 777 COV_Test_over_Pred                  : 0.104040
+5354.8s 778 Unsafe_Overprediction_%             : 42.891566
+5354.8s 779 N                                   : 830
+5354.8s 780 ParetoScore                         : 0.888184
+5354.8s 781 RiskPenalty                         : 0.000000
+5354.8s 782 MeanBiasAbs                         : 0.014804
+5354.8s 783 
+5354.8s 784 [PARETO TOP 12 CANDIDATES]
+5354.8s 785 name  ParetoScore       R2     RMSE      MAE   MAPE_%  Unsafe_Overprediction_%  Mean_Test_over_Pred  COV_Test_over_Pred
+5354.8s 786 meta::ridgecv::conservative_0.985     0.888184 0.932275 0.046964 0.030942 7.074554                42.891566             1.014804            0.104040
+5354.8s 787 meta::ridgecv     0.887285 0.934054 0.046343 0.030435 7.112504                52.168675             0.999582            0.104040
+5354.8s 788 single::BASE_LOCAL     0.883521 0.924620 0.049547 0.031863 7.274383                47.349398             1.003114            0.105729
+5354.8s 789 meta::ridgecv::conservative_0.975     0.880468 0.929129 0.048043 0.032265 7.243098                34.939759             1.025212            0.104040
+5354.8s 790 meta::positive_linear::conservative_0.985     0.878638 0.923959 0.049764 0.032551 7.374165                41.325301             1.013610            0.106621
+5354.8s 791 meta::positive_linear     0.876102 0.925722 0.049184 0.032009 7.398300                52.650602             0.998405            0.106621
+5354.8s 792 avg::top3     0.873883 0.921952 0.050417 0.032394 7.455883                51.566265             1.001834            0.110899
+5354.8s 793 avg::top3::conservative_0.985     0.872001 0.919056 0.051343 0.033221 7.467803                40.722892             1.017090            0.110899
+5354.8s 794 meta::positive_linear::conservative_0.975     0.870977 0.920826 0.050779 0.033814 7.535696                34.939759             1.024005            0.106621
+5354.8s 795 avg::top7     0.870717 0.921438 0.050582 0.033261 8.397017                50.481928             1.000201            0.119222
+5354.8s 796 single::BASE_GEOM     0.867999 0.918060 0.051658 0.032865 7.196582                52.771084             1.005403            0.109270
+5354.8s 797 weighted::top10_inv_rmse     0.866813 0.918447 0.051536 0.033948 8.276352                50.481928             1.004703            0.120958
+5354.8s 798 [CALIBRATION] used=True
+5354.8s 799 CV fold 3: R2=0.93120, RMSE=0.04787, MAPE=7.270%
+5354.8s 800 
+5354.8s 801 --------------------------------------------------------------------------------
+5354.8s 802 CV fold 4
+5354.8s 803 --------------------------------------------------------------------------------
+5354.8s 804 
+5354.8s 805 [FM PROB] Cross-fitting failure-mode probability model
+5354.8s 806 [FM PROB] Classes: ['D', 'DF', 'F', 'L', 'LD', 'LDF', 'LF']
+5370.1s 807 fold 1: acc=0.9206, balanced_acc=0.8553
+5384.7s 808 fold 2: acc=0.8953, balanced_acc=0.8296
+5399.8s 809 fold 3: acc=0.9058, balanced_acc=0.8616
+5399.8s 810 
+5399.8s 811 [EXPERT] BASE_MIN | base=base_min
+5437.4s 812 fold 1/3: R2=0.84735
+5476.7s 813 fold 2/3: R2=0.91660
+5513.7s 814 fold 3/3: R2=0.88243
+5513.7s 815 [EXPERT DONE] BASE_MIN: OOF_R2=0.889059
+5513.7s 816 
+5513.7s 817 [EXPERT] BASE_GLOBAL | base=base_global
+5552.6s 818 fold 1/3: R2=0.87589
+5590.7s 819 fold 2/3: R2=0.92882
+5627.5s 820 fold 3/3: R2=0.89769
+5627.5s 821 [EXPERT DONE] BASE_GLOBAL: OOF_R2=0.909290
+5627.5s 822 
+5627.5s 823 [EXPERT] BASE_LOCAL | base=base_local
+5665.6s 824 fold 1/3: R2=0.89093
+5704.0s 825 fold 2/3: R2=0.94684
+5741.5s 826 fold 3/3: R2=0.91015
+5741.5s 827 [EXPERT DONE] BASE_LOCAL: OOF_R2=0.920092
+5741.5s 828 
+5741.5s 829 [EXPERT] BASE_MEAN | base=base_mean
+5779.3s 830 fold 1/3: R2=0.87692
+5818.0s 831 fold 2/3: R2=0.93919
+5855.1s 832 fold 3/3: R2=0.90001
+5855.1s 833 [EXPERT DONE] BASE_MEAN: OOF_R2=0.918953
+5855.1s 834 
+5855.1s 835 [EXPERT] BASE_GEOM | base=base_geom
+5891.1s 836 fold 1/3: R2=0.88754
+5930.4s 837 fold 2/3: R2=0.94508
+5969.5s 838 fold 3/3: R2=0.90548
+5969.5s 839 [EXPERT DONE] BASE_GEOM: OOF_R2=0.923294
+5969.5s 840 
+5969.5s 841 [EXPERT] BASE_PNE | base=base_pne
+6010.0s 842 fold 1/3: R2=0.87591
+6050.0s 843 fold 2/3: R2=0.92941
+6088.4s 844 fold 3/3: R2=0.89785
+6088.4s 845 [EXPERT DONE] BASE_PNE: OOF_R2=0.908994
+6088.4s 846 
+6088.4s 847 [EXPERT] BASE_PCRL | base=base_pcrl
+6125.6s 848 fold 1/3: R2=0.83935
+6163.6s 849 fold 2/3: R2=0.90399
+6201.0s 850 fold 3/3: R2=0.85963
+6201.0s 851 [EXPERT DONE] BASE_PCRL: OOF_R2=0.879180
+6201.0s 852 
+6201.0s 853 [SPECIALISTS] Design-group specialists
+6201.0s 854 
+6201.0s 855 [EXPERT] SG_SPECIALIST::G1_O2C | base=base_min
+6209.9s 856 fold 1/3: R2=0.90757
+6218.6s 857 fold 2/3: R2=0.89325
+6227.6s 858 fold 3/3: R2=0.88173
+6227.6s 859 [EXPERT DONE] SG_SPECIALIST::G1_O2C: OOF_R2=0.905123
+6227.6s 860 added SG specialist G1_O2C: train=177, test=42, local_OOF_R2=0.90512
+6227.6s 861 
+6227.6s 862 [EXPERT] SG_SPECIALIST::G2_O2U | base=base_min
+6232.0s 863 fold 1/3: R2=0.74752
+6236.4s 864 fold 2/3: R2=0.89049
+6240.9s 865 fold 3/3: R2=0.83729
+6240.9s 866 [EXPERT DONE] SG_SPECIALIST::G2_O2U: OOF_R2=0.881783
+6240.9s 867 added SG specialist G2_O2U: train=78, test=26, local_OOF_R2=0.88178
+6240.9s 868 
+6240.9s 869 [EXPERT] SG_SPECIALIST::G3_CUC | base=base_min
+6246.1s 870 fold 1/3: R2=0.97453
+6250.6s 871 fold 2/3: R2=0.93985
+6255.2s 872 fold 3/3: R2=0.92740
+6255.2s 873 [EXPERT DONE] SG_SPECIALIST::G3_CUC: OOF_R2=0.956657
+6255.2s 874 added SG specialist G3_CUC: train=71, test=18, local_OOF_R2=0.95666
+6255.2s 875 
+6255.2s 876 [EXPERT] SG_SPECIALIST::G4_HC | base=base_min
+6260.0s 877 fold 1/3: R2=0.97267
+6265.2s 878 fold 2/3: R2=0.95259
+6270.5s 879 fold 3/3: R2=0.94414
+6270.5s 880 [EXPERT DONE] SG_SPECIALIST::G4_HC: OOF_R2=0.968919
+6270.5s 881 added SG specialist G4_HC: train=84, test=26, local_OOF_R2=0.96892
+6270.5s 882 
+6270.5s 883 [EXPERT] SG_SPECIALIST::G5_C2C | base=base_min
+6283.4s 884 fold 1/3: R2=0.86756
+6296.1s 885 fold 2/3: R2=0.87669
+6308.5s 886 fold 3/3: R2=0.81621
+6308.5s 887 [EXPERT DONE] SG_SPECIALIST::G5_C2C: OOF_R2=0.859860
+6308.5s 888 added SG specialist G5_C2C: train=259, test=53, local_OOF_R2=0.85986
+6308.5s 889 
+6308.5s 890 [EXPERT] SG_SPECIALIST::G6_Open | base=base_min
+6313.8s 891 fold 1/3: R2=0.94443
+6319.3s 892 fold 2/3: R2=0.93639
+6324.6s 893 fold 3/3: R2=0.93826
+6324.6s 894 [EXPERT DONE] SG_SPECIALIST::G6_Open: OOF_R2=0.956697
+6324.6s 895 added SG specialist G6_Open: train=99, test=26, local_OOF_R2=0.95670
+6324.6s 896 
+6324.6s 897 [EXPERT] SG_SPECIALIST::G7a_Closed_Box | base=base_min
+6329.2s 898 fold 1/3: R2=0.82488
+6333.9s 899 fold 2/3: R2=0.80369
+6338.7s 900 fold 3/3: R2=0.68997
+6338.7s 901 [EXPERT DONE] SG_SPECIALIST::G7a_Closed_Box: OOF_R2=0.791411
+6338.7s 902 added SG specialist G7a_Closed_Box: train=62, test=16, local_OOF_R2=0.79141
+6338.7s 903 
+6338.7s 904 [SPECIALISTS] Slenderness-regime specialists
+6338.7s 905 
+6338.7s 906 [EXPERT] REGIME_SPECIALIST::short | base=base_mean
+6366.5s 907 fold 1/3: R2=0.92226
+6394.2s 908 fold 2/3: R2=0.87496
+6422.5s 909 fold 3/3: R2=0.92812
+6422.5s 910 [EXPERT DONE] REGIME_SPECIALIST::short: OOF_R2=0.919332
+6422.5s 911 added regime specialist short: train=438, test=93, local_OOF_R2=0.91933
+6422.5s 912 
+6422.5s 913 [EXPERT] REGIME_SPECIALIST::intermediate | base=base_mean
+6434.3s 914 fold 1/3: R2=0.87721
+6446.0s 915 fold 2/3: R2=0.79945
+6458.0s 916 fold 3/3: R2=0.84359
+6458.0s 917 [EXPERT DONE] REGIME_SPECIALIST::intermediate: OOF_R2=0.867143
+6458.0s 918 added regime specialist intermediate: train=212, test=62, local_OOF_R2=0.86714
+6458.0s 919 
+6458.0s 920 [EXPERT] REGIME_SPECIALIST::slender | base=base_mean
+6467.8s 921 fold 1/3: R2=0.56645
+6477.8s 922 fold 2/3: R2=0.84861
+6488.2s 923 fold 3/3: R2=0.64072
+6488.2s 924 [EXPERT DONE] REGIME_SPECIALIST::slender: OOF_R2=0.694625
+6488.2s 925 added regime specialist slender: train=180, test=52, local_OOF_R2=0.69462
+6488.2s 926 
+6488.2s 927 ==========================================================================================
+6488.2s 928 PARETO SELECTED STACK BEFORE CALIBRATION
+6488.2s 929 ==========================================================================================
+6488.2s 930 R2                                  : 0.936445
+6488.2s 931 RMSE                                : 0.045080
+6488.2s 932 MAE                                 : 0.029723
+6488.2s 933 MAPE_%                              : 6.638614
+6488.2s 934 Mean_Test_over_Pred                 : 1.015014
+6488.2s 935 COV_Test_over_Pred                  : 0.094133
+6488.2s 936 Unsafe_Overprediction_%             : 43.253012
+6488.2s 937 N                                   : 830
+6488.2s 938 ParetoScore                         : 0.894678
+6488.2s 939 RiskPenalty                         : 0.000000
+6488.2s 940 MeanBiasAbs                         : 0.015014
+6488.2s 941 
+6488.2s 942 [PARETO TOP 12 CANDIDATES]
+6488.2s 943 name  ParetoScore       R2     RMSE      MAE   MAPE_%  Unsafe_Overprediction_%  Mean_Test_over_Pred  COV_Test_over_Pred
+6488.2s 944 meta::ridgecv::conservative_0.985     0.894678 0.936445 0.045080 0.029723 6.638614                43.253012             1.015014            0.094133
+6488.2s 945 meta::ridgecv     0.891724 0.938218 0.044446 0.029398 6.681404                53.373494             0.999789            0.094133
+6488.2s 946 meta::ridgecv::conservative_0.975     0.887153 0.933301 0.046181 0.030714 6.772565                36.987952             1.025425            0.094133
+6488.2s 947 meta::positive_linear::conservative_0.985     0.879657 0.923950 0.049312 0.031246 7.233256                44.457831             1.012884            0.112335
+6488.2s 948 avg::top3::conservative_0.985     0.877440 0.922666 0.049727 0.031315 7.214338                42.891566             1.015849            0.113269
+6488.2s 949 avg::top3     0.875279 0.924862 0.049016 0.030898 7.257091                53.253012             1.000612            0.113269
+6488.2s 950 meta::positive_linear::conservative_0.975     0.872333 0.920816 0.050318 0.032193 7.334085                38.313253             1.023272            0.112335
+6488.2s 951 meta::positive_linear     0.872313 0.925713 0.048737 0.031089 7.330316                54.819277             0.997691            0.112335
+6488.2s 952 single::BASE_GEOM     0.871940 0.923294 0.049524 0.031125 6.856060                54.578313             1.005158            0.110733
+6488.2s 953 avg::top7     0.870497 0.921908 0.049970 0.031971 8.290031                51.204819             0.999868            0.126463
+6488.2s 954 avg::top3::conservative_0.975     0.869607 0.919251 0.050813 0.032434 7.354619                36.626506             1.026268            0.113269
+6488.2s 955 single::BASE_LOCAL     0.869113 0.920092 0.050548 0.031563 7.281247                53.493976             1.002978            0.116526
+6488.2s 956 [CALIBRATION] used=True
+6488.2s 957 CV fold 4: R2=0.93397, RMSE=0.04866, MAPE=6.661%
+6488.2s 958 
+6488.2s 959 --------------------------------------------------------------------------------
+6488.2s 960 CV fold 5
+6488.2s 961 --------------------------------------------------------------------------------
+6488.2s 962 
+6488.2s 963 [FM PROB] Cross-fitting failure-mode probability model
+6488.2s 964 [FM PROB] Classes: ['D', 'DF', 'F', 'L', 'LD', 'LDF', 'LF']
+6504.2s 965 fold 1: acc=0.9386, balanced_acc=0.8990
+6519.6s 966 fold 2: acc=0.8700, balanced_acc=0.7882
+6534.7s 967 fold 3: acc=0.8877, balanced_acc=0.8167
+6534.7s 968 
+6534.7s 969 [EXPERT] BASE_MIN | base=base_min
+6575.6s 970 fold 1/3: R2=0.85896
+6614.8s 971 fold 2/3: R2=0.90336
+6654.4s 972 fold 3/3: R2=0.85028
+6654.4s 973 [EXPERT DONE] BASE_MIN: OOF_R2=0.882687
+6654.4s 974 
+6654.4s 975 [EXPERT] BASE_GLOBAL | base=base_global
+6694.5s 976 fold 1/3: R2=0.90175
+6733.9s 977 fold 2/3: R2=0.91509
+6772.7s 978 fold 3/3: R2=0.89019
+6772.7s 979 [EXPERT DONE] BASE_GLOBAL: OOF_R2=0.912498
+6772.7s 980 
+6772.7s 981 [EXPERT] BASE_LOCAL | base=base_local
+6813.7s 982 fold 1/3: R2=0.91604
+6852.9s 983 fold 2/3: R2=0.92439
+6892.9s 984 fold 3/3: R2=0.90677
+6892.9s 985 [EXPERT DONE] BASE_LOCAL: OOF_R2=0.925934
+6892.9s 986 
+6892.9s 987 [EXPERT] BASE_MEAN | base=base_mean
+6934.2s 988 fold 1/3: R2=0.91446
+6975.7s 989 fold 2/3: R2=0.92096
+7016.8s 990 fold 3/3: R2=0.89681
+7016.8s 991 [EXPERT DONE] BASE_MEAN: OOF_R2=0.923183
+7016.8s 992 
+7016.8s 993 [EXPERT] BASE_GEOM | base=base_geom
+7059.4s 994 fold 1/3: R2=0.90348
+7099.5s 995 fold 2/3: R2=0.92071
+7140.8s 996 fold 3/3: R2=0.90007
+7140.8s 997 [EXPERT DONE] BASE_GEOM: OOF_R2=0.916442
+7140.8s 998 
+7140.8s 999 [EXPERT] BASE_PNE | base=base_pne
+7181.7s 1000 fold 1/3: R2=0.90096
+7222.1s 1001 fold 2/3: R2=0.91584
+7261.2s 1002 fold 3/3: R2=0.89047
+7261.2s 1003 [EXPERT DONE] BASE_PNE: OOF_R2=0.912140
+7261.2s 1004 
+7261.2s 1005 [EXPERT] BASE_PCRL | base=base_pcrl
+7302.6s 1006 fold 1/3: R2=0.84631
+7344.5s 1007 fold 2/3: R2=0.88851
+7385.2s 1008 fold 3/3: R2=0.83917
+7385.2s 1009 [EXPERT DONE] BASE_PCRL: OOF_R2=0.874498
+7385.2s 1010 
+7385.2s 1011 [SPECIALISTS] Design-group specialists
+7385.2s 1012 
+7385.2s 1013 [EXPERT] SG_SPECIALIST::G1_O2C | base=base_min
+7394.6s 1014 fold 1/3: R2=0.94456
+7404.2s 1015 fold 2/3: R2=0.84252
+7413.5s 1016 fold 3/3: R2=0.88948
+7413.5s 1017 [EXPERT DONE] SG_SPECIALIST::G1_O2C: OOF_R2=0.911454
+7413.5s 1018 added SG specialist G1_O2C: train=171, test=48, local_OOF_R2=0.91145
+7413.5s 1019 
+7413.5s 1020 [EXPERT] SG_SPECIALIST::G2_O2U | base=base_min
+7418.3s 1021 fold 1/3: R2=0.92324
+7423.0s 1022 fold 2/3: R2=0.83556
+7427.7s 1023 fold 3/3: R2=0.95709
+7427.7s 1024 [EXPERT DONE] SG_SPECIALIST::G2_O2U: OOF_R2=0.942892
+7427.7s 1025 added SG specialist G2_O2U: train=83, test=21, local_OOF_R2=0.94289
+7427.7s 1026 
+7427.7s 1027 [EXPERT] SG_SPECIALIST::G3_CUC | base=base_min
+7432.4s 1028 fold 1/3: R2=0.94371
+7436.9s 1029 fold 2/3: R2=0.89626
+7441.6s 1030 fold 3/3: R2=0.93816
+7441.6s 1031 [EXPERT DONE] SG_SPECIALIST::G3_CUC: OOF_R2=0.935507
+7441.6s 1032 added SG specialist G3_CUC: train=75, test=14, local_OOF_R2=0.93551
+7441.6s 1033 
+7441.6s 1034 [EXPERT] SG_SPECIALIST::G4_HC | base=base_min
+7446.5s 1035 fold 1/3: R2=0.95876
+7451.5s 1036 fold 2/3: R2=0.98244
+7456.5s 1037 fold 3/3: R2=0.94726
+7456.5s 1038 [EXPERT DONE] SG_SPECIALIST::G4_HC: OOF_R2=0.976736
+7456.5s 1039 added SG specialist G4_HC: train=90, test=20, local_OOF_R2=0.97674
+7456.5s 1040 
+7456.5s 1041 [EXPERT] SG_SPECIALIST::G5_C2C | base=base_min
+7468.4s 1042 fold 1/3: R2=0.84466
+7480.3s 1043 fold 2/3: R2=0.83922
+7492.3s 1044 fold 3/3: R2=0.88703
+7492.4s 1045 [EXPERT DONE] SG_SPECIALIST::G5_C2C: OOF_R2=0.866671
+7492.4s 1046 added SG specialist G5_C2C: train=245, test=67, local_OOF_R2=0.86667
+7492.4s 1047 
+7492.4s 1048 [EXPERT] SG_SPECIALIST::G6_Open | base=base_min
+7497.4s 1049 fold 1/3: R2=0.85644
+7502.7s 1050 fold 2/3: R2=0.92544
+7508.0s 1051 fold 3/3: R2=0.96157
+7508.0s 1052 [EXPERT DONE] SG_SPECIALIST::G6_Open: OOF_R2=0.949683
+7508.0s 1053 added SG specialist G6_Open: train=103, test=22, local_OOF_R2=0.94968
+7508.0s 1054 
+7508.0s 1055 [EXPERT] SG_SPECIALIST::G7a_Closed_Box | base=base_min
+7512.5s 1056 fold 1/3: R2=0.76559
+7517.2s 1057 fold 2/3: R2=0.77355
+7521.9s 1058 fold 3/3: R2=0.61459
+7521.9s 1059 [EXPERT DONE] SG_SPECIALIST::G7a_Closed_Box: OOF_R2=0.751080
+7521.9s 1060 added SG specialist G7a_Closed_Box: train=63, test=15, local_OOF_R2=0.75108
+7521.9s 1061 
+7521.9s 1062 [SPECIALISTS] Slenderness-regime specialists
+7521.9s 1063 
+7521.9s 1064 [EXPERT] REGIME_SPECIALIST::short | base=base_mean
+7550.5s 1065 fold 1/3: R2=0.91426
+7578.1s 1066 fold 2/3: R2=0.91427
+7605.5s 1067 fold 3/3: R2=0.93771
+7605.5s 1068 [EXPERT DONE] REGIME_SPECIALIST::short: OOF_R2=0.930974
+7605.5s 1069 added regime specialist short: train=423, test=108, local_OOF_R2=0.93097
+7605.5s 1070 
+7605.5s 1071 [EXPERT] REGIME_SPECIALIST::intermediate | base=base_mean
+7617.2s 1072 fold 1/3: R2=0.81627
+7629.2s 1073 fold 2/3: R2=0.82392
+7641.1s 1074 fold 3/3: R2=0.83942
+7641.1s 1075 [EXPERT DONE] REGIME_SPECIALIST::intermediate: OOF_R2=0.840305
+7641.1s 1076 added regime specialist intermediate: train=225, test=49, local_OOF_R2=0.84031
+7641.1s 1077 
+7641.1s 1078 [EXPERT] REGIME_SPECIALIST::slender | base=base_mean
+7651.0s 1079 fold 1/3: R2=0.76402
+7661.4s 1080 fold 2/3: R2=0.86079
+7671.4s 1081 fold 3/3: R2=0.84770
+7671.4s 1082 [EXPERT DONE] REGIME_SPECIALIST::slender: OOF_R2=0.835094
+7671.4s 1083 added regime specialist slender: train=182, test=50, local_OOF_R2=0.83509
+7671.4s 1084 
+7671.4s 1085 ==========================================================================================
+7671.4s 1086 PARETO SELECTED STACK BEFORE CALIBRATION
+7671.4s 1087 ==========================================================================================
+7671.4s 1088 R2                                  : 0.941031
+7671.4s 1089 RMSE                                : 0.044068
+7671.4s 1090 MAE                                 : 0.029327
+7671.4s 1091 MAPE_%                              : 6.470714
+7671.4s 1092 Mean_Test_over_Pred                 : 1.013220
+7671.4s 1093 COV_Test_over_Pred                  : 0.089754
+7671.4s 1094 Unsafe_Overprediction_%             : 41.686747
+7671.4s 1095 N                                   : 830
+7671.4s 1096 ParetoScore                         : 0.900815
+7671.4s 1097 RiskPenalty                         : 0.000000
+7671.4s 1098 MeanBiasAbs                         : 0.013220
+7671.4s 1099 
+7671.4s 1100 [PARETO TOP 12 CANDIDATES]
+7671.4s 1101 name  ParetoScore       R2     RMSE      MAE   MAPE_%  Unsafe_Overprediction_%  Mean_Test_over_Pred  COV_Test_over_Pred
+7671.4s 1102 meta::ridgecv::conservative_0.985     0.900815 0.941031 0.044068 0.029327 6.470714                41.686747             1.013220            0.089754
+7671.4s 1103 meta::ridgecv     0.897914 0.942793 0.043405 0.028739 6.472482                52.771084             0.998022            0.089754
+7671.4s 1104 meta::ridgecv::conservative_0.975     0.893187 0.937921 0.045215 0.030514 6.630824                36.385542             1.023612            0.089754
+7671.4s 1105 meta::positive_linear::conservative_0.985     0.882685 0.926795 0.049100 0.032260 7.242943                43.614458             1.012210            0.102494
+7671.4s 1106 single::BASE_LOCAL     0.881221 0.925934 0.049388 0.031816 6.963389                50.963855             1.003085            0.099786
+7671.4s 1107 avg::top3::conservative_0.985     0.880494 0.924851 0.049748 0.032187 6.988053                40.843373             1.016923            0.100662
+7671.4s 1108 avg::top3     0.879110 0.926814 0.049094 0.031719 7.005689                52.771084             1.001669            0.100662
+7671.4s 1109 meta::positive_linear     0.876887 0.928534 0.048514 0.031866 7.324386                53.734940             0.997027            0.102494
+7671.4s 1110 meta::positive_linear::conservative_0.975     0.875271 0.923704 0.050126 0.033377 7.368201                36.867470             1.022592            0.102494
+7671.4s 1111 weighted::top5_inv_rmse::conservative_0.985     0.874119 0.922134 0.050639 0.033125 7.856288                41.686747             1.013729            0.111315
+7671.4s 1112 avg::top5::conservative_0.985     0.873736 0.921911 0.050712 0.033172 7.889437                41.686747             1.013665            0.111717
+7671.4s 1113 avg::top7::conservative_0.985     0.873218 0.921945 0.050701 0.033248 7.808926                40.722892             1.016506            0.110678
+7671.4s 1114 [CALIBRATION] used=True
+7671.4s 1115 CV fold 5: R2=0.92180, RMSE=0.05000, MAPE=7.594%
+7671.4s 1116 
+7671.4s 1117 --------------------------------------------------------------------------------
+7671.4s 1118 CV fold 6
+7671.4s 1119 --------------------------------------------------------------------------------
+7671.4s 1120 
+7671.4s 1121 [FM PROB] Cross-fitting failure-mode probability model
+7671.4s 1122 [FM PROB] Classes: ['D', 'DF', 'F', 'L', 'LD', 'LDF', 'LF']
+7686.5s 1123 fold 1: acc=0.8881, balanced_acc=0.8051
+7702.7s 1124 fold 2: acc=0.8804, balanced_acc=0.8591
+7719.3s 1125 fold 3: acc=0.8949, balanced_acc=0.8610
+7719.3s 1126 
+7719.3s 1127 [EXPERT] BASE_MIN | base=base_min
+7758.7s 1128 fold 1/3: R2=0.84549
+7797.7s 1129 fold 2/3: R2=0.89189
+7835.6s 1130 fold 3/3: R2=0.89636
+7835.6s 1131 [EXPERT DONE] BASE_MIN: OOF_R2=0.885254
+7835.6s 1132 
+7835.6s 1133 [EXPERT] BASE_GLOBAL | base=base_global
+7871.8s 1134 fold 1/3: R2=0.88462
+7908.5s 1135 fold 2/3: R2=0.89630
+7945.7s 1136 fold 3/3: R2=0.90183
+7945.7s 1137 [EXPERT DONE] BASE_GLOBAL: OOF_R2=0.902588
+7945.7s 1138 
+7945.7s 1139 [EXPERT] BASE_LOCAL | base=base_local
+7984.3s 1140 fold 1/3: R2=0.90363
+8023.7s 1141 fold 2/3: R2=0.92455
+8063.6s 1142 fold 3/3: R2=0.91096
+8063.6s 1143 [EXPERT DONE] BASE_LOCAL: OOF_R2=0.919741
+8063.6s 1144 
+8063.6s 1145 [EXPERT] BASE_MEAN | base=base_mean
+8104.3s 1146 fold 1/3: R2=0.89436
+8143.1s 1147 fold 2/3: R2=0.91686
+8182.5s 1148 fold 3/3: R2=0.90704
+8182.5s 1149 [EXPERT DONE] BASE_MEAN: OOF_R2=0.915260
+8182.5s 1150 
+8182.5s 1151 [EXPERT] BASE_GEOM | base=base_geom
+8225.1s 1152 fold 1/3: R2=0.90255
+8264.5s 1153 fold 2/3: R2=0.91362
+8304.2s 1154 fold 3/3: R2=0.90940
+8304.2s 1155 [EXPERT DONE] BASE_GEOM: OOF_R2=0.913906
+8304.2s 1156 
+8304.2s 1157 [EXPERT] BASE_PNE | base=base_pne
+8342.3s 1158 fold 1/3: R2=0.88401
+8380.7s 1159 fold 2/3: R2=0.89458
+8418.5s 1160 fold 3/3: R2=0.90147
+8418.5s 1161 [EXPERT DONE] BASE_PNE: OOF_R2=0.903142
+8418.5s 1162 
+8418.5s 1163 [EXPERT] BASE_PCRL | base=base_pcrl
+8456.1s 1164 fold 1/3: R2=0.84576
+8494.5s 1165 fold 2/3: R2=0.88644
+8533.0s 1166 fold 3/3: R2=0.87687
+8533.0s 1167 [EXPERT DONE] BASE_PCRL: OOF_R2=0.881866
+8533.0s 1168 
+8533.0s 1169 [SPECIALISTS] Design-group specialists
+8533.0s 1170 
+8533.0s 1171 [EXPERT] SG_SPECIALIST::G1_O2C | base=base_min
+8542.2s 1172 fold 1/3: R2=0.93151
+8551.8s 1173 fold 2/3: R2=0.89502
+8561.0s 1174 fold 3/3: R2=0.94697
+8561.0s 1175 [EXPERT DONE] SG_SPECIALIST::G1_O2C: OOF_R2=0.929770
+8561.0s 1176 added SG specialist G1_O2C: train=178, test=41, local_OOF_R2=0.92977
+8561.0s 1177 
+8561.0s 1178 [EXPERT] SG_SPECIALIST::G2_O2U | base=base_min
+8565.4s 1179 fold 1/3: R2=0.83686
+8569.9s 1180 fold 2/3: R2=0.94506
+8574.4s 1181 fold 3/3: R2=0.81029
+8574.4s 1182 [EXPERT DONE] SG_SPECIALIST::G2_O2U: OOF_R2=0.887863
+8574.4s 1183 added SG specialist G2_O2U: train=79, test=25, local_OOF_R2=0.88786
+8574.4s 1184 
+8574.4s 1185 [EXPERT] SG_SPECIALIST::G3_CUC | base=base_min
+8578.7s 1186 fold 1/3: R2=0.92465
+8583.1s 1187 fold 2/3: R2=0.97019
+8587.9s 1188 fold 3/3: R2=0.96438
+8587.9s 1189 [EXPERT DONE] SG_SPECIALIST::G3_CUC: OOF_R2=0.962624
+8587.9s 1190 added SG specialist G3_CUC: train=72, test=17, local_OOF_R2=0.96262
+8587.9s 1191 
+8587.9s 1192 [EXPERT] SG_SPECIALIST::G4_HC | base=base_min
+8592.9s 1193 fold 1/3: R2=0.96281
+8597.9s 1194 fold 2/3: R2=0.94516
+8602.8s 1195 fold 3/3: R2=0.98130
+8602.8s 1196 [EXPERT DONE] SG_SPECIALIST::G4_HC: OOF_R2=0.970982
+8602.8s 1197 added SG specialist G4_HC: train=87, test=23, local_OOF_R2=0.97098
+8602.8s 1198 
+8602.8s 1199 [EXPERT] SG_SPECIALIST::G5_C2C | base=base_min
+8615.1s 1200 fold 1/3: R2=0.83291
+8627.2s 1201 fold 2/3: R2=0.86784
+8639.2s 1202 fold 3/3: R2=0.78446
+8639.2s 1203 [EXPERT DONE] SG_SPECIALIST::G5_C2C: OOF_R2=0.852327
+8639.2s 1204 added SG specialist G5_C2C: train=253, test=59, local_OOF_R2=0.85233
+8639.2s 1205 
+8639.2s 1206 [EXPERT] SG_SPECIALIST::G6_Open | base=base_min
+8644.5s 1207 fold 1/3: R2=0.92213
+8649.8s 1208 fold 2/3: R2=0.90406
+8654.9s 1209 fold 3/3: R2=0.95705
+8654.9s 1210 [EXPERT DONE] SG_SPECIALIST::G6_Open: OOF_R2=0.946877
+8654.9s 1211 added SG specialist G6_Open: train=96, test=29, local_OOF_R2=0.94688
+8654.9s 1212 
+8654.9s 1213 [EXPERT] SG_SPECIALIST::G7a_Closed_Box | base=base_min
+8659.5s 1214 fold 1/3: R2=0.80982
+8664.2s 1215 fold 2/3: R2=0.70171
+8668.8s 1216 fold 3/3: R2=0.78623
+8668.8s 1217 [EXPERT DONE] SG_SPECIALIST::G7a_Closed_Box: OOF_R2=0.800631
+8668.8s 1218 added SG specialist G7a_Closed_Box: train=64, test=14, local_OOF_R2=0.80063
+8668.8s 1219 
+8668.8s 1220 [SPECIALISTS] Slenderness-regime specialists
+8668.8s 1221 
+8668.8s 1222 [EXPERT] REGIME_SPECIALIST::short | base=base_mean
+8696.0s 1223 fold 1/3: R2=0.90898
+8722.2s 1224 fold 2/3: R2=0.89314
+8748.7s 1225 fold 3/3: R2=0.91283
+8748.7s 1226 [EXPERT DONE] REGIME_SPECIALIST::short: OOF_R2=0.914106
+8748.7s 1227 added regime specialist short: train=426, test=105, local_OOF_R2=0.91411
+8748.7s 1228 
+8748.7s 1229 [EXPERT] REGIME_SPECIALIST::intermediate | base=base_mean
+8760.0s 1230 fold 1/3: R2=0.80433
+8771.4s 1231 fold 2/3: R2=0.86484
+8782.9s 1232 fold 3/3: R2=0.85777
+8782.9s 1233 [EXPERT DONE] REGIME_SPECIALIST::intermediate: OOF_R2=0.851111
+8782.9s 1234 added regime specialist intermediate: train=213, test=61, local_OOF_R2=0.85111
+8782.9s 1235 
+8782.9s 1236 [EXPERT] REGIME_SPECIALIST::slender | base=base_mean
+8793.0s 1237 fold 1/3: R2=0.78169
+8802.7s 1238 fold 2/3: R2=0.74687
+8812.6s 1239 fold 3/3: R2=0.79540
+8812.6s 1240 [EXPERT DONE] REGIME_SPECIALIST::slender: OOF_R2=0.787401
+8812.6s 1241 added regime specialist slender: train=190, test=42, local_OOF_R2=0.78740
+8812.6s 1242 
+8812.6s 1243 ==========================================================================================
+8812.6s 1244 PARETO SELECTED STACK BEFORE CALIBRATION
+8812.6s 1245 ==========================================================================================
+8812.6s 1246 R2                                  : 0.933964
+8812.6s 1247 RMSE                                : 0.046821
+8812.6s 1248 MAE                                 : 0.031472
+8812.6s 1249 MAPE_%                              : 7.309639
+8812.6s 1250 Mean_Test_over_Pred                 : 1.012545
+8812.6s 1251 COV_Test_over_Pred                  : 0.102639
+8812.6s 1252 Unsafe_Overprediction_%             : 42.340169
+8812.6s 1253 N                                   : 829
+8812.6s 1254 ParetoScore                         : 0.889371
+8812.6s 1255 RiskPenalty                         : 0.000000
+8812.6s 1256 MeanBiasAbs                         : 0.012545
+8812.6s 1257 
+8812.6s 1258 [PARETO TOP 12 CANDIDATES]
+8812.6s 1259 name  ParetoScore       R2     RMSE      MAE   MAPE_%  Unsafe_Overprediction_%  Mean_Test_over_Pred  COV_Test_over_Pred
+8812.6s 1260 meta::ridgecv::conservative_0.985     0.889371 0.933964 0.046821 0.031472 7.309639                42.340169             1.012545            0.102639
+8812.6s 1261 meta::ridgecv::conservative_0.975     0.881958 0.930916 0.047890 0.032612 7.442129                37.394451             1.022930            0.102639
+8812.6s 1262 meta::ridgecv     0.881814 0.935686 0.046206 0.031092 7.373293                54.885404             0.997357            0.102639
+8812.6s 1263 single::BASE_LOCAL     0.876675 0.919741 0.051617 0.033419 7.677497                47.044632             1.002400            0.108228
+8812.6s 1264 meta::positive_linear::conservative_0.985     0.873718 0.921272 0.051123 0.033777 7.906136                43.546441             1.011629            0.111867
+8812.6s 1265 avg::top3     0.872672 0.920457 0.051387 0.033495 7.837246                50.422195             1.000915            0.110633
+8812.6s 1266 avg::top3::conservative_0.985     0.868536 0.917672 0.052279 0.034538 7.905600                38.721351             1.016158            0.110633
+8812.6s 1267 avg::top7     0.868256 0.918818 0.051914 0.034529 9.060472                48.371532             0.999826            0.122956
+8812.6s 1268 meta::positive_linear::conservative_0.975     0.866383 0.918235 0.052100 0.034899 8.027361                36.791315             1.022004            0.111867
+8812.6s 1269 weighted::top10_inv_rmse     0.865447 0.917862 0.052218 0.034786 8.789936                49.336550             1.004754            0.125348
+8812.6s 1270 single::BASE_MEAN     0.865209 0.915260 0.053039 0.034861 8.910556                48.371532             0.998928            0.122841
+8812.6s 1271 meta::positive_linear     0.864661 0.922980 0.050565 0.033508 8.006028                55.247286             0.996454            0.111867
+8812.6s 1272 [CALIBRATION] used=False
+8812.6s 1273 CV fold 6: R2=0.93648, RMSE=0.04437, MAPE=6.037%
+8812.6s 1274 
+8812.6s 1275 --------------------------------------------------------------------------------
+8812.6s 1276 CV fold 7
+8812.6s 1277 --------------------------------------------------------------------------------
+8812.6s 1278 
+8812.6s 1279 [FM PROB] Cross-fitting failure-mode probability model
+8812.6s 1280 [FM PROB] Classes: ['D', 'DF', 'F', 'L', 'LD', 'LDF', 'LF']
+8828.3s 1281 fold 1: acc=0.8809, balanced_acc=0.8167
+8843.0s 1282 fold 2: acc=0.8877, balanced_acc=0.8145
+8858.2s 1283 fold 3: acc=0.8804, balanced_acc=0.8751
+8858.2s 1284 
+8858.2s 1285 [EXPERT] BASE_MIN | base=base_min
+8895.5s 1286 fold 1/3: R2=0.84008
+8933.1s 1287 fold 2/3: R2=0.87855
+8971.0s 1288 fold 3/3: R2=0.88784
+8971.0s 1289 [EXPERT DONE] BASE_MIN: OOF_R2=0.873286
+8971.0s 1290 
+8971.0s 1291 [EXPERT] BASE_GLOBAL | base=base_global
+9007.5s 1292 fold 1/3: R2=0.87775
+9044.1s 1293 fold 2/3: R2=0.88787
+9082.5s 1294 fold 3/3: R2=0.89557
+9082.5s 1295 [EXPERT DONE] BASE_GLOBAL: OOF_R2=0.893066
+9082.5s 1296 
+9082.5s 1297 [EXPERT] BASE_LOCAL | base=base_local
+9119.3s 1298 fold 1/3: R2=0.89557
+9156.0s 1299 fold 2/3: R2=0.90470
+9194.2s 1300 fold 3/3: R2=0.91234
+9194.2s 1301 [EXPERT DONE] BASE_LOCAL: OOF_R2=0.909896
+9194.2s 1302 
+9194.2s 1303 [EXPERT] BASE_MEAN | base=base_mean
+9231.9s 1304 fold 1/3: R2=0.89907
+9270.2s 1305 fold 2/3: R2=0.89208
+9307.9s 1306 fold 3/3: R2=0.89856
+9307.9s 1307 [EXPERT DONE] BASE_MEAN: OOF_R2=0.901624
+9307.9s 1308 
+9307.9s 1309 [EXPERT] BASE_GEOM | base=base_geom
+9346.3s 1310 fold 1/3: R2=0.88687
+9385.5s 1311 fold 2/3: R2=0.89372
+9423.8s 1312 fold 3/3: R2=0.90294
+9423.8s 1313 [EXPERT DONE] BASE_GEOM: OOF_R2=0.902558
+9423.8s 1314 
+9423.8s 1315 [EXPERT] BASE_PNE | base=base_pne
+9461.2s 1316 fold 1/3: R2=0.87751
+9498.9s 1317 fold 2/3: R2=0.88896
+9537.7s 1318 fold 3/3: R2=0.89519
+9537.7s 1319 [EXPERT DONE] BASE_PNE: OOF_R2=0.889453
+9537.7s 1320 
+9537.7s 1321 [EXPERT] BASE_PCRL | base=base_pcrl
+9577.7s 1322 fold 1/3: R2=0.83673
+9615.8s 1323 fold 2/3: R2=0.84403
+9654.7s 1324 fold 3/3: R2=0.86991
+9654.7s 1325 [EXPERT DONE] BASE_PCRL: OOF_R2=0.863588
+9654.7s 1326 
+9654.7s 1327 [SPECIALISTS] Design-group specialists
+9654.7s 1328 
+9654.7s 1329 [EXPERT] SG_SPECIALIST::G1_O2C | base=base_min
+9664.0s 1330 fold 1/3: R2=0.89956
+9672.7s 1331 fold 2/3: R2=0.86699
+9681.3s 1332 fold 3/3: R2=0.89081
+9681.3s 1333 [EXPERT DONE] SG_SPECIALIST::G1_O2C: OOF_R2=0.900687
+9681.3s 1334 added SG specialist G1_O2C: train=170, test=49, local_OOF_R2=0.90069
+9681.3s 1335 
+9681.3s 1336 [EXPERT] SG_SPECIALIST::G2_O2U | base=base_min
+9685.7s 1337 fold 1/3: R2=0.87668
+9690.1s 1338 fold 2/3: R2=0.88547
+9694.6s 1339 fold 3/3: R2=0.87703
+9694.6s 1340 [EXPERT DONE] SG_SPECIALIST::G2_O2U: OOF_R2=0.913796
+9694.6s 1341 added SG specialist G2_O2U: train=83, test=21, local_OOF_R2=0.91380
+9694.6s 1342 
+9694.6s 1343 [EXPERT] SG_SPECIALIST::G3_CUC | base=base_min
+9699.1s 1344 fold 1/3: R2=0.97094
+9703.6s 1345 fold 2/3: R2=0.91869
+9707.9s 1346 fold 3/3: R2=0.92945
+9707.9s 1347 [EXPERT DONE] SG_SPECIALIST::G3_CUC: OOF_R2=0.947355
+9707.9s 1348 added SG specialist G3_CUC: train=69, test=20, local_OOF_R2=0.94736
+9707.9s 1349 
+9707.9s 1350 [EXPERT] SG_SPECIALIST::G4_HC | base=base_min
+9712.7s 1351 fold 1/3: R2=0.82378
+9717.6s 1352 fold 2/3: R2=0.97015
+9722.4s 1353 fold 3/3: R2=0.96283
+9722.4s 1354 [EXPERT DONE] SG_SPECIALIST::G4_HC: OOF_R2=0.918014
+9722.4s 1355 added SG specialist G4_HC: train=94, test=16, local_OOF_R2=0.91801
+9722.4s 1356 
+9722.4s 1357 [EXPERT] SG_SPECIALIST::G5_C2C | base=base_min
+9734.2s 1358 fold 1/3: R2=0.83629
+9745.6s 1359 fold 2/3: R2=0.89623
+9757.7s 1360 fold 3/3: R2=0.80737
+9757.7s 1361 [EXPERT DONE] SG_SPECIALIST::G5_C2C: OOF_R2=0.854300
+9757.7s 1362 added SG specialist G5_C2C: train=246, test=66, local_OOF_R2=0.85430
+9757.7s 1363 
+9757.7s 1364 [EXPERT] SG_SPECIALIST::G6_Open | base=base_min
+9763.0s 1365 fold 1/3: R2=0.93559
+9768.5s 1366 fold 2/3: R2=0.95528
+9773.9s 1367 fold 3/3: R2=0.92008
+9773.9s 1368 [EXPERT DONE] SG_SPECIALIST::G6_Open: OOF_R2=0.948703
+9773.9s 1369 added SG specialist G6_Open: train=107, test=18, local_OOF_R2=0.94870
+9773.9s 1370 
+9773.9s 1371 [EXPERT] SG_SPECIALIST::G7a_Closed_Box | base=base_min
+9778.5s 1372 fold 1/3: R2=0.78728
+9783.0s 1373 fold 2/3: R2=0.62847
+9787.6s 1374 fold 3/3: R2=0.35521
+9787.6s 1375 [EXPERT DONE] SG_SPECIALIST::G7a_Closed_Box: OOF_R2=0.718747
+9787.6s 1376 added SG specialist G7a_Closed_Box: train=60, test=18, local_OOF_R2=0.71875
+9787.6s 1377 
+9787.6s 1378 [SPECIALISTS] Slenderness-regime specialists
+9787.6s 1379 
+9787.6s 1380 [EXPERT] REGIME_SPECIALIST::short | base=base_mean
+9815.0s 1381 fold 1/3: R2=0.90078
+9842.2s 1382 fold 2/3: R2=0.93842
+9868.6s 1383 fold 3/3: R2=0.88711
+9868.6s 1384 [EXPERT DONE] REGIME_SPECIALIST::short: OOF_R2=0.915393
+9868.6s 1385 added regime specialist short: train=424, test=107, local_OOF_R2=0.91539
+9868.6s 1386 
+9868.6s 1387 [EXPERT] REGIME_SPECIALIST::intermediate | base=base_mean
+9880.6s 1388 fold 1/3: R2=0.86426
+9892.3s 1389 fold 2/3: R2=0.87384
+9904.1s 1390 fold 3/3: R2=0.81110
+9904.1s 1391 [EXPERT DONE] REGIME_SPECIALIST::intermediate: OOF_R2=0.862250
+9904.1s 1392 added regime specialist intermediate: train=224, test=50, local_OOF_R2=0.86225
+9904.1s 1393 
+9904.1s 1394 [EXPERT] REGIME_SPECIALIST::slender | base=base_mean
+9914.1s 1395 fold 1/3: R2=0.76956
+9924.3s 1396 fold 2/3: R2=0.70735
+9935.0s 1397 fold 3/3: R2=0.76764
+9935.0s 1398 [EXPERT DONE] REGIME_SPECIALIST::slender: OOF_R2=0.763296
+9935.0s 1399 added regime specialist slender: train=181, test=51, local_OOF_R2=0.76330
+9935.0s 1400 
+9935.0s 1401 ==========================================================================================
+9935.0s 1402 PARETO SELECTED STACK BEFORE CALIBRATION
+9935.0s 1403 ==========================================================================================
+9935.0s 1404 R2                                  : 0.929290
+9935.0s 1405 RMSE                                : 0.047623
+9935.0s 1406 MAE                                 : 0.031375
+9935.0s 1407 MAPE_%                              : 6.881369
+9935.0s 1408 Mean_Test_over_Pred                 : 1.014858
+9935.0s 1409 COV_Test_over_Pred                  : 0.099379
+9935.0s 1410 Unsafe_Overprediction_%             : 42.581423
+9935.0s 1411 N                                   : 829
+9935.0s 1412 ParetoScore                         : 0.886242
+9935.0s 1413 RiskPenalty                         : 0.000000
+9935.0s 1414 MeanBiasAbs                         : 0.014858
+9935.0s 1415 
+9935.0s 1416 [PARETO TOP 12 CANDIDATES]
+9935.0s 1417 name  ParetoScore       R2     RMSE      MAE   MAPE_%  Unsafe_Overprediction_%  Mean_Test_over_Pred  COV_Test_over_Pred
+9935.0s 1418 meta::ridgecv::conservative_0.985     0.886242 0.929290 0.047623 0.031375 6.881369                42.581423             1.014858            0.099379
+9935.0s 1419 meta::ridgecv     0.882434 0.931090 0.047013 0.030971 6.925343                53.799759             0.999635            0.099379
+9935.0s 1420 meta::ridgecv::conservative_0.975     0.878566 0.926105 0.048684 0.032555 7.035638                35.826297             1.025267            0.099379
+9935.0s 1421 meta::positive_linear::conservative_0.985     0.862003 0.910777 0.053495 0.035182 8.073587                46.803378             1.012484            0.119218
+9935.0s 1422 single::BASE_LOCAL     0.861097 0.909896 0.053759 0.034831 7.898569                50.301568             1.003469            0.118376
+9935.0s 1423 avg::top3::conservative_0.985     0.855742 0.905456 0.055068 0.035684 7.959567                41.857660             1.016961            0.120782
+9935.0s 1424 avg::top3     0.855033 0.908142 0.054280 0.035114 8.004836                52.714113             1.001707            0.120782
+9935.0s 1425 meta::positive_linear::conservative_0.975     0.854955 0.907611 0.054436 0.035981 8.118588                40.530760             1.022868            0.119218
+9935.0s 1426 weighted::top5_inv_rmse     0.854303 0.907617 0.054435 0.035359 8.498413                51.628468             1.000119            0.125154
+9935.0s 1427 avg::top5     0.853644 0.907500 0.054469 0.035382 8.520519                51.869723             1.000079            0.125396
+9935.0s 1428 weighted::top5_inv_rmse::conservative_0.985     0.852957 0.904751 0.055273 0.035921 8.440246                42.581423             1.015350            0.125154
+9935.0s 1429 avg::top5::conservative_0.985     0.852731 0.904628 0.055308 0.035942 8.461607                42.822678             1.015309            0.125396
+9935.0s 1430 [CALIBRATION] used=True
+9935.0s 1431 CV fold 7: R2=0.93787, RMSE=0.04684, MAPE=7.650%
+9935.0s 1432 
+9935.0s 1433 --------------------------------------------------------------------------------
+9935.0s 1434 CV fold 8
+9935.0s 1435 --------------------------------------------------------------------------------
+9935.0s 1436 
+9935.0s 1437 [FM PROB] Cross-fitting failure-mode probability model
+9935.0s 1438 [FM PROB] Classes: ['D', 'DF', 'F', 'L', 'LD', 'LDF', 'LF']
+9951.7s 1439 fold 1: acc=0.9242, balanced_acc=0.8925
+9967.6s 1440 fold 2: acc=0.8845, balanced_acc=0.8150
+9983.9s 1441 fold 3: acc=0.9203, balanced_acc=0.8906
+9983.9s 1442 
+9983.9s 1443 [EXPERT] BASE_MIN | base=base_min
+10023.8s 1444 fold 1/3: R2=0.86832
+10063.1s 1445 fold 2/3: R2=0.84560
+10102.8s 1446 fold 3/3: R2=0.88814
+10102.8s 1447 [EXPERT DONE] BASE_MIN: OOF_R2=0.876756
+10102.8s 1448 
+10102.8s 1449 [EXPERT] BASE_GLOBAL | base=base_global
+10140.5s 1450 fold 1/3: R2=0.89824
+10178.4s 1451 fold 2/3: R2=0.86798
+10216.1s 1452 fold 3/3: R2=0.89943
+10216.1s 1453 [EXPERT DONE] BASE_GLOBAL: OOF_R2=0.898587
+10216.1s 1454 
+10216.1s 1455 [EXPERT] BASE_LOCAL | base=base_local
+10254.8s 1456 fold 1/3: R2=0.90963
+10293.6s 1457 fold 2/3: R2=0.89313
+10331.1s 1458 fold 3/3: R2=0.91654
+10331.1s 1459 [EXPERT DONE] BASE_LOCAL: OOF_R2=0.911753
+10331.1s 1460 
+10331.1s 1461 [EXPERT] BASE_MEAN | base=base_mean
+10370.5s 1462 fold 1/3: R2=0.91072
+10408.3s 1463 fold 2/3: R2=0.87897
+10446.1s 1464 fold 3/3: R2=0.90697
+10446.1s 1465 [EXPERT DONE] BASE_MEAN: OOF_R2=0.905714
+10446.1s 1466 
+10446.1s 1467 [EXPERT] BASE_GEOM | base=base_geom
+10483.9s 1468 fold 1/3: R2=0.91215
+10521.9s 1469 fold 2/3: R2=0.87369
+10560.7s 1470 fold 3/3: R2=0.90409
+10560.7s 1471 [EXPERT DONE] BASE_GEOM: OOF_R2=0.911798
+10560.7s 1472 
+10560.7s 1473 [EXPERT] BASE_PNE | base=base_pne
+10598.1s 1474 fold 1/3: R2=0.89709
+10635.4s 1475 fold 2/3: R2=0.86871
+10674.2s 1476 fold 3/3: R2=0.89808
+10674.2s 1477 [EXPERT DONE] BASE_PNE: OOF_R2=0.899424
+10674.2s 1478 
+10674.2s 1479 [EXPERT] BASE_PCRL | base=base_pcrl
+10711.7s 1480 fold 1/3: R2=0.86512
+10749.6s 1481 fold 2/3: R2=0.82355
+10786.5s 1482 fold 3/3: R2=0.87918
+10786.5s 1483 [EXPERT DONE] BASE_PCRL: OOF_R2=0.874265
+10786.5s 1484 
+10786.5s 1485 [SPECIALISTS] Design-group specialists
+10786.5s 1486 
+10786.5s 1487 [EXPERT] SG_SPECIALIST::G1_O2C | base=base_min
+10795.8s 1488 fold 1/3: R2=0.88910
+10804.7s 1489 fold 2/3: R2=0.84471
+10813.6s 1490 fold 3/3: R2=0.88983
+10813.6s 1491 [EXPERT DONE] SG_SPECIALIST::G1_O2C: OOF_R2=0.897822
+10813.6s 1492 added SG specialist G1_O2C: train=182, test=37, local_OOF_R2=0.89782
+10813.6s 1493 
+10813.6s 1494 [EXPERT] SG_SPECIALIST::G2_O2U | base=base_min
+10818.4s 1495 fold 1/3: R2=0.91226
+10822.8s 1496 fold 2/3: R2=0.90695
+10827.2s 1497 fold 3/3: R2=0.94594
+10827.2s 1498 [EXPERT DONE] SG_SPECIALIST::G2_O2U: OOF_R2=0.928823
+10827.2s 1499 added SG specialist G2_O2U: train=90, test=14, local_OOF_R2=0.92882
+10827.2s 1500 
+10827.2s 1501 [EXPERT] SG_SPECIALIST::G3_CUC | base=base_min
+10831.5s 1502 fold 1/3: R2=0.94059
+10835.7s 1503 fold 2/3: R2=0.93077
+10840.1s 1504 fold 3/3: R2=0.94522
+10840.1s 1505 [EXPERT DONE] SG_SPECIALIST::G3_CUC: OOF_R2=0.955113
+10840.1s 1506 added SG specialist G3_CUC: train=70, test=19, local_OOF_R2=0.95511
+10840.1s 1507 
+10840.1s 1508 [EXPERT] SG_SPECIALIST::G4_HC | base=base_min
+10844.6s 1509 fold 1/3: R2=0.97444
+10849.2s 1510 fold 2/3: R2=0.95493
+10853.8s 1511 fold 3/3: R2=0.93699
+10853.8s 1512 [EXPERT DONE] SG_SPECIALIST::G4_HC: OOF_R2=0.962844
+10853.8s 1513 added SG specialist G4_HC: train=84, test=26, local_OOF_R2=0.96284
+10853.8s 1514 
+10853.8s 1515 [EXPERT] SG_SPECIALIST::G5_C2C | base=base_min
+10865.1s 1516 fold 1/3: R2=0.78897
+10876.5s 1517 fold 2/3: R2=0.79069
+10887.9s 1518 fold 3/3: R2=0.86046
+10887.9s 1519 [EXPERT DONE] SG_SPECIALIST::G5_C2C: OOF_R2=0.830933
+10887.9s 1520 added SG specialist G5_C2C: train=241, test=71, local_OOF_R2=0.83093
+10887.9s 1521 
+10887.9s 1522 [EXPERT] SG_SPECIALIST::G6_Open | base=base_min
+10893.4s 1523 fold 1/3: R2=0.93434
+10898.6s 1524 fold 2/3: R2=0.93291
+10903.6s 1525 fold 3/3: R2=0.92861
+10903.6s 1526 [EXPERT DONE] SG_SPECIALIST::G6_Open: OOF_R2=0.949953
+10903.6s 1527 added SG specialist G6_Open: train=98, test=27, local_OOF_R2=0.94995
+10903.6s 1528 
+10903.6s 1529 [EXPERT] SG_SPECIALIST::G7a_Closed_Box | base=base_min
+10907.9s 1530 fold 1/3: R2=0.87308
+10912.3s 1531 fold 2/3: R2=0.65430
+10916.9s 1532 fold 3/3: R2=0.76807
+10916.9s 1533 [EXPERT DONE] SG_SPECIALIST::G7a_Closed_Box: OOF_R2=0.801710
+10916.9s 1534 added SG specialist G7a_Closed_Box: train=65, test=13, local_OOF_R2=0.80171
+10916.9s 1535 
+10916.9s 1536 [SPECIALISTS] Slenderness-regime specialists
+10916.9s 1537 
+10916.9s 1538 [EXPERT] REGIME_SPECIALIST::short | base=base_mean
+10943.5s 1539 fold 1/3: R2=0.90507
+10970.0s 1540 fold 2/3: R2=0.93422
+10996.5s 1541 fold 3/3: R2=0.90923
+10996.5s 1542 [EXPERT DONE] REGIME_SPECIALIST::short: OOF_R2=0.922145
+10996.5s 1543 added regime specialist short: train=426, test=105, local_OOF_R2=0.92215
+10996.5s 1544 
+10996.5s 1545 [EXPERT] REGIME_SPECIALIST::intermediate | base=base_mean
+11008.0s 1546 fold 1/3: R2=0.78524
+11019.3s 1547 fold 2/3: R2=0.85525
+11030.3s 1548 fold 3/3: R2=0.70444
+11030.3s 1549 [EXPERT DONE] REGIME_SPECIALIST::intermediate: OOF_R2=0.804794
+11030.3s 1550 added regime specialist intermediate: train=217, test=57, local_OOF_R2=0.80479
+11030.3s 1551 
+11030.3s 1552 [EXPERT] REGIME_SPECIALIST::slender | base=base_mean
+11040.3s 1553 fold 1/3: R2=0.77379
+11050.0s 1554 fold 2/3: R2=0.76139
+11059.2s 1555 fold 3/3: R2=0.75241
+11059.2s 1556 [EXPERT DONE] REGIME_SPECIALIST::slender: OOF_R2=0.780619
+11059.2s 1557 added regime specialist slender: train=187, test=45, local_OOF_R2=0.78062
+11059.2s 1558 
+11059.2s 1559 ==========================================================================================
+11059.2s 1560 PARETO SELECTED STACK BEFORE CALIBRATION
+11059.2s 1561 ==========================================================================================
+11059.2s 1562 R2                                  : 0.925906
+11059.2s 1563 RMSE                                : 0.048484
+11059.2s 1564 MAE                                 : 0.031326
+11059.2s 1565 MAPE_%                              : 6.944394
+11059.2s 1566 Mean_Test_over_Pred                 : 1.014002
+11059.2s 1567 COV_Test_over_Pred                  : 0.097841
+11059.2s 1568 Unsafe_Overprediction_%             : 43.855422
+11059.2s 1569 N                                   : 830
+11059.2s 1570 ParetoScore                         : 0.882811
+11059.2s 1571 RiskPenalty                         : 0.000000
+11059.2s 1572 MeanBiasAbs                         : 0.014002
+11059.2s 1573 
+11059.2s 1574 [PARETO TOP 12 CANDIDATES]
+11059.2s 1575 name  ParetoScore       R2     RMSE      MAE   MAPE_%  Unsafe_Overprediction_%  Mean_Test_over_Pred  COV_Test_over_Pred
+11059.2s 1576 meta::ridgecv::conservative_0.985     0.882811 0.925906 0.048484 0.031326 6.944394                43.855422             1.014002            0.097841
+11059.2s 1577 meta::ridgecv     0.877734 0.927707 0.047891 0.031089 7.013994                54.096386             0.998792            0.097841
+11059.2s 1578 meta::ridgecv::conservative_0.975     0.875352 0.922735 0.049510 0.032280 7.062270                37.469880             1.024402            0.097841
+11059.2s 1579 meta::positive_linear::conservative_0.985     0.868633 0.913581 0.052361 0.033461 7.339950                47.228916             1.013081            0.105106
+11059.2s 1580 single::BASE_LOCAL     0.863530 0.911753 0.052912 0.033412 7.445132                51.325301             1.003681            0.107296
+11059.2s 1581 avg::top3::conservative_0.985     0.863096 0.910209 0.053373 0.033896 7.466375                44.698795             1.017278            0.107612
+11059.2s 1582 avg::top3     0.862782 0.913142 0.052494 0.033522 7.545229                52.530120             1.002019            0.107612
+11059.2s 1583 meta::positive_linear::conservative_0.975     0.861589 0.910434 0.053306 0.034128 7.387356                40.843373             1.023471            0.105106
+11059.2s 1584 single::BASE_GEOM     0.861098 0.911798 0.052899 0.034212 7.449994                52.409639             1.005109            0.105508
+11059.2s 1585 meta::positive_linear     0.860503 0.915351 0.051822 0.033529 7.487557                55.180723             0.997885            0.105106
+11059.2s 1586 avg::top7::conservative_0.985     0.857438 0.908188 0.053971 0.035013 8.232682                43.975904             1.015629            0.115785
+11059.2s 1587 weighted::top5_inv_rmse::conservative_0.985     0.856548 0.907410 0.054199 0.034787 8.391101                45.060241             1.013461            0.118192
+11059.2s 1588 [CALIBRATION] used=False
+11059.2s 1589 CV fold 8: R2=0.94478, RMSE=0.04510, MAPE=6.239%
+11059.2s 1590 
+11059.2s 1591 --------------------------------------------------------------------------------
+11059.2s 1592 CV fold 9
+11059.2s 1593 --------------------------------------------------------------------------------
+11059.2s 1594 
+11059.2s 1595 [FM PROB] Cross-fitting failure-mode probability model
+11059.2s 1596 [FM PROB] Classes: ['D', 'DF', 'F', 'L', 'LD', 'LDF', 'LF']
+11074.5s 1597 fold 1: acc=0.8809, balanced_acc=0.8365
+11089.4s 1598 fold 2: acc=0.8953, balanced_acc=0.8027
+11104.4s 1599 fold 3: acc=0.9167, balanced_acc=0.8128
+11104.4s 1600 
+11104.4s 1601 [EXPERT] BASE_MIN | base=base_min
+11141.9s 1602 fold 1/3: R2=0.82787
+11179.5s 1603 fold 2/3: R2=0.87764
+11218.1s 1604 fold 3/3: R2=0.90619
+11218.1s 1605 [EXPERT DONE] BASE_MIN: OOF_R2=0.876563
+11218.1s 1606 
+11218.1s 1607 [EXPERT] BASE_GLOBAL | base=base_global
+11254.9s 1608 fold 1/3: R2=0.85883
+11291.9s 1609 fold 2/3: R2=0.91141
+11328.8s 1610 fold 3/3: R2=0.91992
+11328.8s 1611 [EXPERT DONE] BASE_GLOBAL: OOF_R2=0.904991
+11328.8s 1612 
+11328.8s 1613 [EXPERT] BASE_LOCAL | base=base_local
+11366.0s 1614 fold 1/3: R2=0.88788
+11402.7s 1615 fold 2/3: R2=0.91970
+11441.0s 1616 fold 3/3: R2=0.93366
+11441.0s 1617 [EXPERT DONE] BASE_LOCAL: OOF_R2=0.922471
+11441.0s 1618 
+11441.0s 1619 [EXPERT] BASE_MEAN | base=base_mean
+11478.2s 1620 fold 1/3: R2=0.88858
+11515.6s 1621 fold 2/3: R2=0.90704
+11553.8s 1622 fold 3/3: R2=0.92471
+11553.8s 1623 [EXPERT DONE] BASE_MEAN: OOF_R2=0.912681
+11553.8s 1624 
+11553.8s 1625 [EXPERT] BASE_GEOM | base=base_geom
+11590.6s 1626 fold 1/3: R2=0.86923
+11627.6s 1627 fold 2/3: R2=0.90453
+11664.5s 1628 fold 3/3: R2=0.93011
+11664.5s 1629 [EXPERT DONE] BASE_GEOM: OOF_R2=0.915997
+11664.5s 1630 
+11664.5s 1631 [EXPERT] BASE_PNE | base=base_pne
+11701.6s 1632 fold 1/3: R2=0.85925
+11738.2s 1633 fold 2/3: R2=0.91114
+11775.2s 1634 fold 3/3: R2=0.91912
+11775.2s 1635 [EXPERT DONE] BASE_PNE: OOF_R2=0.906099
+11775.2s 1636 
+11775.2s 1637 [EXPERT] BASE_PCRL | base=base_pcrl
+11812.1s 1638 fold 1/3: R2=0.81827
+11848.5s 1639 fold 2/3: R2=0.85623
+11886.1s 1640 fold 3/3: R2=0.89388
+11886.1s 1641 [EXPERT DONE] BASE_PCRL: OOF_R2=0.870505
+11886.1s 1642 
+11886.1s 1643 [SPECIALISTS] Design-group specialists
+11886.1s 1644 
+11886.1s 1645 [EXPERT] SG_SPECIALIST::G1_O2C | base=base_min
+11895.5s 1646 fold 1/3: R2=0.91363
+11904.3s 1647 fold 2/3: R2=0.83493
+11913.3s 1648 fold 3/3: R2=0.86237
+11913.3s 1649 [EXPERT DONE] SG_SPECIALIST::G1_O2C: OOF_R2=0.879905
+11913.3s 1650 added SG specialist G1_O2C: train=179, test=40, local_OOF_R2=0.87991
+11913.3s 1651 
+11913.3s 1652 [EXPERT] SG_SPECIALIST::G2_O2U | base=base_min
+11917.6s 1653 fold 1/3: R2=0.45146
+11921.7s 1654 fold 2/3: R2=0.95489
+11926.1s 1655 fold 3/3: R2=0.90936
+11926.1s 1656 [EXPERT DONE] SG_SPECIALIST::G2_O2U: OOF_R2=0.933396
+11926.1s 1657 added SG specialist G2_O2U: train=79, test=25, local_OOF_R2=0.93340
+11926.1s 1658 
+11926.1s 1659 [EXPERT] SG_SPECIALIST::G3_CUC | base=base_min
+11930.3s 1660 fold 1/3: R2=0.94095
+11934.6s 1661 fold 2/3: R2=0.97236
+11938.8s 1662 fold 3/3: R2=0.92127
+11938.8s 1663 [EXPERT DONE] SG_SPECIALIST::G3_CUC: OOF_R2=0.948522
+11938.8s 1664 added SG specialist G3_CUC: train=71, test=18, local_OOF_R2=0.94852
+11938.8s 1665 
+11938.8s 1666 [EXPERT] SG_SPECIALIST::G4_HC | base=base_min
+11943.6s 1667 fold 1/3: R2=0.96571
+11948.4s 1668 fold 2/3: R2=0.95629
+11953.2s 1669 fold 3/3: R2=0.96859
+11953.2s 1670 [EXPERT DONE] SG_SPECIALIST::G4_HC: OOF_R2=0.966407
+11953.2s 1671 added SG specialist G4_HC: train=88, test=22, local_OOF_R2=0.96641
+11953.2s 1672 
+11953.2s 1673 [EXPERT] SG_SPECIALIST::G5_C2C | base=base_min
+11965.0s 1674 fold 1/3: R2=0.85321
+11976.8s 1675 fold 2/3: R2=0.72649
+11988.6s 1676 fold 3/3: R2=0.83591
+11988.6s 1677 [EXPERT DONE] SG_SPECIALIST::G5_C2C: OOF_R2=0.826849
+11988.6s 1678 added SG specialist G5_C2C: train=254, test=58, local_OOF_R2=0.82685
+11988.6s 1679 
+11988.6s 1680 [EXPERT] SG_SPECIALIST::G6_Open | base=base_min
+11993.5s 1681 fold 1/3: R2=0.92197
+11998.2s 1682 fold 2/3: R2=0.88526
+12003.1s 1683 fold 3/3: R2=0.93327
+12003.1s 1684 [EXPERT DONE] SG_SPECIALIST::G6_Open: OOF_R2=0.933885
+12003.1s 1685 added SG specialist G6_Open: train=98, test=27, local_OOF_R2=0.93388
+12003.1s 1686 
+12003.1s 1687 [EXPERT] SG_SPECIALIST::G7a_Closed_Box | base=base_min
+12007.5s 1688 fold 1/3: R2=0.83505
+12011.7s 1689 fold 2/3: R2=0.68344
+12016.2s 1690 fold 3/3: R2=0.58192
+12016.2s 1691 [EXPERT DONE] SG_SPECIALIST::G7a_Closed_Box: OOF_R2=0.732338
+12016.2s 1692 added SG specialist G7a_Closed_Box: train=61, test=17, local_OOF_R2=0.73234
+12016.2s 1693 
+12016.2s 1694 [SPECIALISTS] Slenderness-regime specialists
+12016.2s 1695 
+12016.2s 1696 [EXPERT] REGIME_SPECIALIST::short | base=base_mean
+12042.4s 1697 fold 1/3: R2=0.93130
+12068.5s 1698 fold 2/3: R2=0.92126
+12093.8s 1699 fold 3/3: R2=0.92043
+12093.8s 1700 [EXPERT DONE] REGIME_SPECIALIST::short: OOF_R2=0.932932
+12093.8s 1701 added regime specialist short: train=415, test=116, local_OOF_R2=0.93293
+12093.8s 1702 
+12093.8s 1703 [EXPERT] REGIME_SPECIALIST::intermediate | base=base_mean
+12105.5s 1704 fold 1/3: R2=0.85313
+12116.9s 1705 fold 2/3: R2=0.84688
+12128.2s 1706 fold 3/3: R2=0.83763
+12128.2s 1707 [EXPERT DONE] REGIME_SPECIALIST::intermediate: OOF_R2=0.846338
+12128.2s 1708 added regime specialist intermediate: train=222, test=52, local_OOF_R2=0.84634
+12128.2s 1709 
+12128.2s 1710 [EXPERT] REGIME_SPECIALIST::slender | base=base_mean
+12138.1s 1711 fold 1/3: R2=0.74325
+12148.5s 1712 fold 2/3: R2=0.74153
+12158.7s 1713 fold 3/3: R2=0.77299
+12158.7s 1714 [EXPERT DONE] REGIME_SPECIALIST::slender: OOF_R2=0.774145
+12158.7s 1715 added regime specialist slender: train=193, test=39, local_OOF_R2=0.77415
+12158.7s 1716 
+12158.7s 1717 ==========================================================================================
+12158.7s 1718 PARETO SELECTED STACK BEFORE CALIBRATION
+12158.7s 1719 ==========================================================================================
+12158.7s 1720 R2                                  : 0.932483
+12158.7s 1721 RMSE                                : 0.048047
+12158.7s 1722 MAE                                 : 0.031892
+12158.7s 1723 MAPE_%                              : 7.132874
+12158.7s 1724 Mean_Test_over_Pred                 : 1.013345
+12158.7s 1725 COV_Test_over_Pred                  : 0.102811
+12158.7s 1726 Unsafe_Overprediction_%             : 43.373494
+12158.7s 1727 N                                   : 830
+12158.7s 1728 ParetoScore                         : 0.888581
+12158.7s 1729 RiskPenalty                         : 0.000000
+12158.7s 1730 MeanBiasAbs                         : 0.013345
+12158.7s 1731 
+12158.7s 1732 [PARETO TOP 12 CANDIDATES]
+12158.7s 1733 name  ParetoScore       R2     RMSE      MAE   MAPE_%  Unsafe_Overprediction_%  Mean_Test_over_Pred  COV_Test_over_Pred
+12158.7s 1734 meta::ridgecv::conservative_0.985     0.888581 0.932483 0.048047 0.031892 7.132874                43.373494             1.013345            0.102811
+12158.7s 1735 meta::ridgecv     0.884470 0.934160 0.047446 0.031600 7.197399                53.253012             0.998145            0.102811
+12158.7s 1736 meta::ridgecv::conservative_0.975     0.881320 0.929518 0.049090 0.032888 7.252574                37.349398             1.023739            0.102811
+12158.7s 1737 meta::positive_linear::conservative_0.985     0.876106 0.921439 0.051827 0.032532 7.474056                44.096386             1.012074            0.114311
+12158.7s 1738 single::BASE_LOCAL     0.872905 0.922471 0.051486 0.032315 7.371033                52.409639             1.003108            0.113334
+12158.7s 1739 avg::top3::conservative_0.985     0.870409 0.917502 0.053110 0.032890 7.471788                42.048193             1.017135            0.116818
+12158.7s 1740 meta::positive_linear::conservative_0.975     0.868865 0.918488 0.052792 0.033596 7.593469                37.228916             1.022454            0.114311
+12158.7s 1741 meta::positive_linear     0.865403 0.923099 0.051277 0.032371 7.587532                56.265060             0.996893            0.114311
+12158.7s 1742 avg::top3     0.864383 0.919670 0.052408 0.032624 7.543080                55.301205             1.001878            0.116818
+12158.7s 1743 weighted::top5_inv_rmse::conservative_0.985     0.863259 0.914802 0.053972 0.033852 8.503689                43.734940             1.013638            0.127866
+12158.7s 1744 avg::top7::conservative_0.985     0.863193 0.915305 0.053813 0.033902 8.401257                43.132530             1.016871            0.127477
+12158.7s 1745 avg::top5::conservative_0.985     0.862782 0.914564 0.054047 0.033908 8.553552                43.734940             1.013537            0.128364
+12158.7s 1746 [CALIBRATION] used=True
+12158.7s 1747 CV fold 9: R2=0.91277, RMSE=0.04850, MAPE=7.310%
+12158.7s 1748 
+12158.7s 1749 --------------------------------------------------------------------------------
+12158.7s 1750 CV fold 10
+12158.7s 1751 --------------------------------------------------------------------------------
+12158.7s 1752 
+12158.7s 1753 [FM PROB] Cross-fitting failure-mode probability model
+12158.7s 1754 [FM PROB] Classes: ['D', 'DF', 'F', 'L', 'LD', 'LDF', 'LF']
+12173.4s 1755 fold 1: acc=0.9170, balanced_acc=0.8750
+12188.8s 1756 fold 2: acc=0.9134, balanced_acc=0.8458
+12203.9s 1757 fold 3: acc=0.8804, balanced_acc=0.8212
+12203.9s 1758 
+12203.9s 1759 [EXPERT] BASE_MIN | base=base_min
+12241.8s 1760 fold 1/3: R2=0.90329
+12278.2s 1761 fold 2/3: R2=0.86433
+12314.7s 1762 fold 3/3: R2=0.87359
+12314.7s 1763 [EXPERT DONE] BASE_MIN: OOF_R2=0.887117
+12314.7s 1764 
+12314.7s 1765 [EXPERT] BASE_GLOBAL | base=base_global
+12352.4s 1766 fold 1/3: R2=0.91847
+12389.5s 1767 fold 2/3: R2=0.89972
+12426.9s 1768 fold 3/3: R2=0.89864
+12426.9s 1769 [EXPERT DONE] BASE_GLOBAL: OOF_R2=0.911610
+12426.9s 1770 
+12426.9s 1771 [EXPERT] BASE_LOCAL | base=base_local
+12463.8s 1772 fold 1/3: R2=0.92660
+12501.3s 1773 fold 2/3: R2=0.90783
+12537.5s 1774 fold 3/3: R2=0.91489
+12537.5s 1775 [EXPERT DONE] BASE_LOCAL: OOF_R2=0.923337
+12537.5s 1776 
+12537.5s 1777 [EXPERT] BASE_MEAN | base=base_mean
+12574.3s 1778 fold 1/3: R2=0.92490
+12612.4s 1779 fold 2/3: R2=0.91216
+12650.3s 1780 fold 3/3: R2=0.90783
+12650.3s 1781 [EXPERT DONE] BASE_MEAN: OOF_R2=0.918495
+12650.3s 1782 
+12650.3s 1783 [EXPERT] BASE_GEOM | base=base_geom
+12687.8s 1784 fold 1/3: R2=0.92130
+12723.8s 1785 fold 2/3: R2=0.90950
+12760.9s 1786 fold 3/3: R2=0.91039
+12760.9s 1787 [EXPERT DONE] BASE_GEOM: OOF_R2=0.918934
+12760.9s 1788 
+12760.9s 1789 [EXPERT] BASE_PNE | base=base_pne
+12798.7s 1790 fold 1/3: R2=0.91784
+12837.5s 1791 fold 2/3: R2=0.89964
+12875.3s 1792 fold 3/3: R2=0.89801
+12875.3s 1793 [EXPERT DONE] BASE_PNE: OOF_R2=0.911034
+12875.3s 1794 
+12875.3s 1795 [EXPERT] BASE_PCRL | base=base_pcrl
+12914.5s 1796 fold 1/3: R2=0.88757
+12952.0s 1797 fold 2/3: R2=0.86172
+12990.0s 1798 fold 3/3: R2=0.87130
+12990.0s 1799 [EXPERT DONE] BASE_PCRL: OOF_R2=0.880145
+12990.0s 1800 
+12990.0s 1801 [SPECIALISTS] Design-group specialists
+12990.0s 1802 
+12990.0s 1803 [EXPERT] SG_SPECIALIST::G1_O2C | base=base_min
+12999.1s 1804 fold 1/3: R2=0.81762
+13007.7s 1805 fold 2/3: R2=0.93532
+13017.0s 1806 fold 3/3: R2=0.94709
+13017.0s 1807 [EXPERT DONE] SG_SPECIALIST::G1_O2C: OOF_R2=0.915023
+13017.0s 1808 added SG specialist G1_O2C: train=167, test=52, local_OOF_R2=0.91502
+13017.0s 1809 
+13017.0s 1810 [EXPERT] SG_SPECIALIST::G2_O2U | base=base_min
+13021.3s 1811 fold 1/3: R2=0.91671
+13025.6s 1812 fold 2/3: R2=0.92360
+13029.9s 1813 fold 3/3: R2=0.90482
+13029.9s 1814 [EXPERT DONE] SG_SPECIALIST::G2_O2U: OOF_R2=0.919772
+13029.9s 1815 added SG specialist G2_O2U: train=85, test=19, local_OOF_R2=0.91977
+13029.9s 1816 
+13029.9s 1817 [EXPERT] SG_SPECIALIST::G3_CUC | base=base_min
+13034.4s 1818 fold 1/3: R2=0.89899
+13038.6s 1819 fold 2/3: R2=0.92534
+13043.2s 1820 fold 3/3: R2=0.94282
+13043.2s 1821 [EXPERT DONE] SG_SPECIALIST::G3_CUC: OOF_R2=0.920209
+13043.2s 1822 added SG specialist G3_CUC: train=74, test=15, local_OOF_R2=0.92021
+13043.2s 1823 
+13043.2s 1824 [EXPERT] SG_SPECIALIST::G4_HC | base=base_min
+13047.7s 1825 fold 1/3: R2=0.95779
+13052.5s 1826 fold 2/3: R2=0.95809
+13057.4s 1827 fold 3/3: R2=0.98662
+13057.4s 1828 [EXPERT DONE] SG_SPECIALIST::G4_HC: OOF_R2=0.977690
+13057.4s 1829 added SG specialist G4_HC: train=87, test=23, local_OOF_R2=0.97769
+13057.4s 1830 
+13057.4s 1831 [EXPERT] SG_SPECIALIST::G5_C2C | base=base_min
+13069.3s 1832 fold 1/3: R2=0.79567
+13081.5s 1833 fold 2/3: R2=0.78459
+13093.1s 1834 fold 3/3: R2=0.89771
+13093.1s 1835 [EXPERT DONE] SG_SPECIALIST::G5_C2C: OOF_R2=0.835456
+13093.1s 1836 added SG specialist G5_C2C: train=254, test=58, local_OOF_R2=0.83546
+13093.1s 1837 
+13093.1s 1838 [EXPERT] SG_SPECIALIST::G6_Open | base=base_min
+13098.0s 1839 fold 1/3: R2=0.92110
+13103.0s 1840 fold 2/3: R2=0.95400
+13108.3s 1841 fold 3/3: R2=0.94570
+13108.3s 1842 [EXPERT DONE] SG_SPECIALIST::G6_Open: OOF_R2=0.951466
+13108.3s 1843 added SG specialist G6_Open: train=101, test=24, local_OOF_R2=0.95147
+13108.3s 1844 
+13108.3s 1845 [EXPERT] SG_SPECIALIST::G7a_Closed_Box | base=base_min
+13112.9s 1846 fold 1/3: R2=0.74356
+13117.4s 1847 fold 2/3: R2=0.60494
+13121.8s 1848 fold 3/3: R2=0.62496
+13121.8s 1849 [EXPERT DONE] SG_SPECIALIST::G7a_Closed_Box: OOF_R2=0.697000
+13121.8s 1850 added SG specialist G7a_Closed_Box: train=62, test=16, local_OOF_R2=0.69700
+13121.8s 1851 
+13121.8s 1852 [SPECIALISTS] Slenderness-regime specialists
+13121.8s 1853 
+13121.8s 1854 [EXPERT] REGIME_SPECIALIST::short | base=base_mean
+13148.1s 1855 fold 1/3: R2=0.90510
+13174.5s 1856 fold 2/3: R2=0.92401
+13201.9s 1857 fold 3/3: R2=0.86888
+13201.9s 1858 [EXPERT DONE] REGIME_SPECIALIST::short: OOF_R2=0.914323
+13201.9s 1859 added regime specialist short: train=433, test=98, local_OOF_R2=0.91432
+13201.9s 1860 
+13201.9s 1861 [EXPERT] REGIME_SPECIALIST::intermediate | base=base_mean
+13213.4s 1862 fold 1/3: R2=0.90482
+13224.4s 1863 fold 2/3: R2=0.81119
+13235.4s 1864 fold 3/3: R2=0.73222
+13235.4s 1865 [EXPERT DONE] REGIME_SPECIALIST::intermediate: OOF_R2=0.864159
+13235.4s 1866 added regime specialist intermediate: train=220, test=54, local_OOF_R2=0.86416
+13235.4s 1867 
+13235.4s 1868 [EXPERT] REGIME_SPECIALIST::slender | base=base_mean
+13245.0s 1869 fold 1/3: R2=0.64363
+13254.6s 1870 fold 2/3: R2=0.81439
+13264.2s 1871 fold 3/3: R2=0.85931
+13264.2s 1872 [EXPERT DONE] REGIME_SPECIALIST::slender: OOF_R2=0.801615
+13264.2s 1873 added regime specialist slender: train=177, test=55, local_OOF_R2=0.80161
+13264.2s 1874 
+13264.2s 1875 ==========================================================================================
+13264.2s 1876 PARETO SELECTED STACK BEFORE CALIBRATION
+13264.2s 1877 ==========================================================================================
+13264.2s 1878 R2                                  : 0.934245
+13264.2s 1879 RMSE                                : 0.046283
+13264.2s 1880 MAE                                 : 0.031166
+13264.2s 1881 MAPE_%                              : 7.087528
+13264.2s 1882 Mean_Test_over_Pred                 : 1.014282
+13264.2s 1883 COV_Test_over_Pred                  : 0.104760
+13264.2s 1884 Unsafe_Overprediction_%             : 42.289157
+13264.2s 1885 N                                   : 830
+13264.2s 1886 ParetoScore                         : 0.890265
+13264.2s 1887 RiskPenalty                         : 0.000000
+13264.2s 1888 MeanBiasAbs                         : 0.014282
+13264.2s 1889 
+13264.2s 1890 [PARETO TOP 12 CANDIDATES]
+13264.2s 1891 name  ParetoScore       R2     RMSE      MAE   MAPE_%  Unsafe_Overprediction_%  Mean_Test_over_Pred  COV_Test_over_Pred
+13264.2s 1892 meta::ridgecv::conservative_0.985     0.890265 0.934245 0.046283 0.031166 7.087528                42.289157             1.014282            0.104760
+13264.2s 1893 meta::ridgecv     0.888789 0.936013 0.045657 0.030643 7.123089                52.289157             0.999067            0.104760
+13264.2s 1894 meta::ridgecv::conservative_0.975     0.882664 0.931123 0.047370 0.032389 7.239802                36.024096             1.024684            0.104760
+13264.2s 1895 single::BASE_LOCAL     0.878146 0.923337 0.049975 0.032888 7.645023                49.036145             1.003653            0.113524
+13264.2s 1896 meta::positive_linear::conservative_0.985     0.876117 0.923010 0.050082 0.033479 7.652250                43.975904             1.013731            0.112865
+13264.2s 1897 avg::top3     0.875583 0.922792 0.050152 0.033007 7.797414                50.000000             1.002068            0.116122
+13264.2s 1898 meta::positive_linear     0.873406 0.924757 0.049510 0.033032 7.720741                52.650602             0.998525            0.112865
+13264.2s 1899 single::BASE_GEOM     0.871543 0.918934 0.051390 0.033687 7.583101                50.000000             1.005953            0.115622
+13264.2s 1900 avg::top3::conservative_0.985     0.870603 0.919745 0.051133 0.034001 7.832207                40.120482             1.017327            0.116122
+13264.2s 1901 avg::top7     0.870273 0.921271 0.050644 0.034184 8.693363                49.518072             1.001291            0.125066
+13264.2s 1902 meta::positive_linear::conservative_0.975     0.868694 0.919903 0.051082 0.034611 7.775305                37.108434             1.024128            0.112865
+13264.2s 1903 weighted::top5_inv_rmse     0.867821 0.920633 0.050849 0.034006 8.929082                49.638554             0.997850            0.128167
+13264.2s 1904 [CALIBRATION] used=True
+13264.2s 1905 CV fold 10: R2=0.91401, RMSE=0.05363, MAPE=8.301%
+13264.2s 1906 
+13264.2s 1907 ==========================================================================================
+13264.2s 1908 REPEATED CV SUMMARY
+13264.2s 1909 ==========================================================================================
+13264.2s 1910 R2_mean                             : 0.931015
+13264.2s 1911 R2_std                              : 0.012517
+13264.2s 1912 RMSE_mean                           : 0.047208
+13264.2s 1913 RMSE_std                            : 0.004115
+13264.2s 1914 MAE_mean                            : 0.030587
+13264.2s 1915 MAE_std                             : 0.003031
+13264.2s 1916 MAPE_%_mean                         : 6.961112
+13264.2s 1917 MAPE_%_std                          : 0.832298
+13264.2s 1918 Mean_Test_over_Pred_mean            : 1.005643
+13264.2s 1919 Mean_Test_over_Pred_std             : 0.010261
+13264.2s 1920 COV_Test_over_Pred_mean             : 0.100215
+13264.2s 1921 COV_Test_over_Pred_std              : 0.010826
+13264.2s 1922 Unsafe_Overprediction_%_mean        : 48.125697
+13264.2s 1923 Unsafe_Overprediction_%_std         : 6.411531
+13264.9s 1924 
+13264.9s 1925 [SHAP] Compact XGBoost interpretation model
+13268.0s 1926 Feature  MeanAbsSHAP
+13268.0s 1927 DSM_local     0.069001
+13268.0s 1928 base_geom     0.028425
+13268.0s 1929 SectionType_te     0.013826
+13268.0s 1930 Fy_E     0.009309
+13268.0s 1931 base_local     0.007781
+13268.0s 1932 lambda_c_b_t     0.006856
+13268.0s 1933 Pcrl_Py     0.005966
+13268.0s 1934 SG_design_te     0.005114
+13268.0s 1935 base_mean     0.005052
+13268.0s 1936 A_t2     0.005045
+13268.0s 1937 h_t_b_t     0.004624
+13268.0s 1938 L_b     0.004276
+13268.0s 1939 BC_te     0.004009
+13268.0s 1940 b_t     0.003579
+13268.0s 1941 h_b     0.003540
+13268.0s 1942 lambda_led_Pcrl     0.003479
+13268.0s 1943 L_t     0.003458
+13268.0s 1944 KLr     0.002951
+13268.0s 1945 is_open_section     0.002844
+13268.0s 1946 lambda_c_h_t     0.002815
+13270.9s 1947 Traceback (most recent call last):
+13270.9s 1948 File "<string>", line 1, in <module>
+13270.9s 1949 File "/usr/local/lib/python3.12/dist-packages/papermill/execute.py", line 131, in execute_notebook
+13270.9s 1950 raise_for_execution_errors(nb, output_path)
+13270.9s 1951 File "/usr/local/lib/python3.12/dist-packages/papermill/execute.py", line 251, in raise_for_execution_errors
+13270.9s 1952 raise error
+13270.9s 1953 papermill.exceptions.PapermillExecutionError:
+13270.9s 1954 ---------------------------------------------------------------------------
+13270.9s 1955 Exception encountered at "In [1]":
+13270.9s 1956 ---------------------------------------------------------------------------
+13270.9s 1957 TypeError                                 Traceback (most recent call last)
+13270.9s 1958 /tmp/ipykernel_23/2495263232.py in <cell line: 0>()
+13270.9s 1959 1646
+13270.9s 1960 1647 if __name__ == "__main__":
+13270.9s 1961 -> 1648     main()
+13270.9s 1962 
+13270.9s 1963 /tmp/ipykernel_23/2495263232.py in main()
+13270.9s 1964 1623     }
+13270.9s 1965 1624     with open(out_dir / "v16_final_summary.json", "w", encoding="utf-8") as f:
+13270.9s 1966 -> 1625         json.dump(summary, f, indent=2, ensure_ascii=False)
+13270.9s 1967 1626
+13270.9s 1968 1627     if CONFIG["SAVE_MODELS"] and HAS_JOBLIB:
+13270.9s 1969 
+13270.9s 1970 /usr/lib/python3.12/json/__init__.py in dump(obj, fp, skipkeys, ensure_ascii, check_circular, allow_nan, cls, indent, separators, default, sort_keys, **kw)
+13270.9s 1971 177     # could accelerate with writelines in some versions of Python, at
+13270.9s 1972 178     # a debuggability cost
+13270.9s 1973 --> 179     for chunk in iterable:
+13270.9s 1974 180         fp.write(chunk)
+13270.9s 1975 181
+13270.9s 1976 
+13270.9s 1977 /usr/lib/python3.12/json/encoder.py in _iterencode(o, _current_indent_level)
+13270.9s 1978 430             yield from _iterencode_list(o, _current_indent_level)
+13270.9s 1979 431         elif isinstance(o, dict):
+13270.9s 1980 --> 432             yield from _iterencode_dict(o, _current_indent_level)
+13270.9s 1981 433         else:
+13270.9s 1982 434             if markers is not None:
+13270.9s 1983 
+13270.9s 1984 /usr/lib/python3.12/json/encoder.py in _iterencode_dict(dct, _current_indent_level)
+13270.9s 1985 404                 else:
+13270.9s 1986 405                     chunks = _iterencode(value, _current_indent_level)
+13270.9s 1987 --> 406                 yield from chunks
+13270.9s 1988 407         if newline_indent is not None:
+13270.9s 1989 408             _current_indent_level -= 1
+13270.9s 1990 
+13270.9s 1991 /usr/lib/python3.12/json/encoder.py in _iterencode_dict(dct, _current_indent_level)
+13270.9s 1992 404                 else:
+13270.9s 1993 405                     chunks = _iterencode(value, _current_indent_level)
+13270.9s 1994 --> 406                 yield from chunks
+13270.9s 1995 407         if newline_indent is not None:
+13270.9s 1996 408             _current_indent_level -= 1
+13270.9s 1997 
+13270.9s 1998 /usr/lib/python3.12/json/encoder.py in _iterencode_list(lst, _current_indent_level)
+13270.9s 1999 324                 else:
+13270.9s 2000 325                     chunks = _iterencode(value, _current_indent_level)
+13270.9s 2001 --> 326                 yield from chunks
+13270.9s 2002 327         if newline_indent is not None:
+13270.9s 2003 328             _current_indent_level -= 1
+13270.9s 2004 
+13270.9s 2005 /usr/lib/python3.12/json/encoder.py in _iterencode_dict(dct, _current_indent_level)
+13270.9s 2006 404                 else:
+13270.9s 2007 405                     chunks = _iterencode(value, _current_indent_level)
+13270.9s 2008 --> 406                 yield from chunks
+13270.9s 2009 407         if newline_indent is not None:
+13270.9s 2010 408             _current_indent_level -= 1
+13270.9s 2011 
+13270.9s 2012 /usr/lib/python3.12/json/encoder.py in _iterencode(o, _current_indent_level)
+13270.9s 2013 437                     raise ValueError("Circular reference detected")
+13270.9s 2014 438                 markers[markerid] = o
+13270.9s 2015 --> 439             o = _default(o)
+13270.9s 2016 440             yield from _iterencode(o, _current_indent_level)
+13270.9s 2017 441             if markers is not None:
+13270.9s 2018 
+13270.9s 2019 /usr/lib/python3.12/json/encoder.py in default(self, o)
+13270.9s 2020 178
+13270.9s 2021 179         """
+13270.9s 2022 --> 180         raise TypeError(f'Object of type {o.__class__.__name__} '
+13270.9s 2023 181                         f'is not JSON serializable')
+13270.9s 2024 182
+13270.9s 2025 
+13270.9s 2026 TypeError: Object of type RidgeCV is not JSON serializable
+13270.9s 2027 
+13273.0s 2028 /usr/local/lib/python3.12/dist-packages/mistune.py:435: SyntaxWarning: invalid escape sequence '\|'
+13273.0s 2029 cells[i][c] = re.sub('\\\\\|', '|', cell)
+13273.1s 2030 /usr/local/lib/python3.12/dist-packages/nbconvert/filters/filter_links.py:36: SyntaxWarning: invalid escape sequence '\_'
+13273.1s 2031 text = re.sub(r'_', '\_', text) # Escape underscores in display text
+13273.7s 2032 [NbConvertApp] Converting notebook __notebook__.ipynb to notebook
+13274.1s 2033 [NbConvertApp] Writing 197142 bytes to __notebook__.ipynb
+13276.3s 2034 [NbConvertApp] Converting notebook __notebook__.ipynb to html
+13277.4s 2035 [NbConvertApp] Writing 711386 bytes to __results__.html
