@@ -54,6 +54,9 @@ CONFIG = {
     "USE_DESIGN_GROUP_SPECIALISTS": True,
     "USE_SLENDERNESS_REGIME_SPECIALISTS": True,
     "MIN_SPECIALIST_ROWS": 55,
+    # v17 gating: only accept a specialist if it beats the fallback baseline
+    # on its own subset by at least this margin (in R² units).
+    "SPECIALIST_GATE_EPS": 0.003,
     "MULTIOBJECTIVE_SAFETY_TARGET_UNSAFE": 48.0,
     "CONFORMAL_ALPHA": 0.10,
 
@@ -1409,7 +1412,8 @@ def run_v16_pipeline(train_df, test_df, seed=42, verbose=True):
     # v16 design-group specialist experts, using design group only (not true FM).
     if CONFIG.get("USE_DESIGN_GROUP_SPECIALISTS", True):
         min_rows = CONFIG.get("MIN_SPECIALIST_ROWS", 55)
-        print("\n[SPECIALISTS] Design-group specialists")
+        gate_eps = CONFIG.get("SPECIALIST_GATE_EPS", 0.003)
+        print("\n[SPECIALISTS] Design-group specialists (with gating)")
         # Use a copy of the first global expert as default fallback.
         fallback_oof = expert_oof[0].copy()
         fallback_test = expert_test[0].copy()
@@ -1423,6 +1427,16 @@ def run_v16_pipeline(train_df, test_df, seed=42, verbose=True):
                 sub_tr = train_df.loc[tr_mask].copy().reset_index(drop=True)
                 sub_te = test_df.loc[te_mask].copy().reset_index(drop=True)
                 poof_g, ptest_g, info_g = train_correction_expert(f"SG_SPECIALIST::{sg}", sub_tr, sub_te, "base_min", seed=seed + 701)
+                # GATING: only add specialist if it beats the fallback on its own subset.
+                y_subset = train_df.loc[tr_mask, "PtPy"].values
+                try:
+                    fallback_subset_r2 = r2_score(y_subset, np.clip(fallback_oof[tr_mask], CONFIG["PRED_MIN"], CONFIG["PRED_MAX"]))
+                except Exception:
+                    fallback_subset_r2 = -np.inf
+                local_r2 = float(info_g.get("oof_r2", -np.inf))
+                if not (local_r2 > fallback_subset_r2 + gate_eps):
+                    print(f"  [GATE REJECTED] SG {sg}: local={local_r2:.5f} <= fallback={fallback_subset_r2:.5f}+{gate_eps}")
+                    continue
                 stitched_oof = fallback_oof.copy()
                 stitched_test = fallback_test.copy()
                 stitched_oof[tr_mask] = poof_g
@@ -1431,15 +1445,18 @@ def run_v16_pipeline(train_df, test_df, seed=42, verbose=True):
                 expert_test.append(stitched_test)
                 info_g["specialist_type"] = "SG_design"
                 info_g["group"] = sg
+                info_g["gate_passed"] = True
+                info_g["fallback_subset_r2"] = float(fallback_subset_r2)
                 expert_info.append(info_g)
-                print(f"  added SG specialist {sg}: train={ntr}, test={nte}, local_OOF_R2={info_g.get('oof_r2', np.nan):.5f}")
+                print(f"  [GATE PASSED] SG {sg}: train={ntr}, test={nte}, local_R2={local_r2:.5f} > fallback_R2={fallback_subset_r2:.5f}")
             except Exception as e:
                 print(f"  [SPECIALIST WARN] SG {sg} failed: {repr(e)}")
 
     # v16 slenderness-regime specialists: short/intermediate/slender, no FM leakage.
     if CONFIG.get("USE_SLENDERNESS_REGIME_SPECIALISTS", True):
         min_rows = CONFIG.get("MIN_SPECIALIST_ROWS", 55)
-        print("\n[SPECIALISTS] Slenderness-regime specialists")
+        gate_eps = CONFIG.get("SPECIALIST_GATE_EPS", 0.003)
+        print("\n[SPECIALISTS] Slenderness-regime specialists (with gating)")
         fallback_oof = expert_oof[0].copy()
         fallback_test = expert_test[0].copy()
 
@@ -1463,6 +1480,16 @@ def run_v16_pipeline(train_df, test_df, seed=42, verbose=True):
                 sub_tr = train_df.loc[tr_mask].copy().reset_index(drop=True)
                 sub_te = test_df.loc[te_mask].copy().reset_index(drop=True)
                 poof_r, ptest_r, info_r = train_correction_expert(f"REGIME_SPECIALIST::{rg}", sub_tr, sub_te, "base_mean", seed=seed + 801)
+                # GATING
+                y_subset = train_df.loc[tr_mask, "PtPy"].values
+                try:
+                    fallback_subset_r2 = r2_score(y_subset, np.clip(fallback_oof[tr_mask], CONFIG["PRED_MIN"], CONFIG["PRED_MAX"]))
+                except Exception:
+                    fallback_subset_r2 = -np.inf
+                local_r2 = float(info_r.get("oof_r2", -np.inf))
+                if not (local_r2 > fallback_subset_r2 + gate_eps):
+                    print(f"  [GATE REJECTED] regime {rg}: local={local_r2:.5f} <= fallback={fallback_subset_r2:.5f}+{gate_eps}")
+                    continue
                 stitched_oof = fallback_oof.copy()
                 stitched_test = fallback_test.copy()
                 stitched_oof[tr_mask] = poof_r
@@ -1471,19 +1498,21 @@ def run_v16_pipeline(train_df, test_df, seed=42, verbose=True):
                 expert_test.append(stitched_test)
                 info_r["specialist_type"] = "lambda_c_regime"
                 info_r["group"] = rg
+                info_r["gate_passed"] = True
+                info_r["fallback_subset_r2"] = float(fallback_subset_r2)
                 expert_info.append(info_r)
-                print(f"  added regime specialist {rg}: train={ntr}, test={nte}, local_OOF_R2={info_r.get('oof_r2', np.nan):.5f}")
+                print(f"  [GATE PASSED] regime {rg}: train={ntr}, test={nte}, local_R2={local_r2:.5f} > fallback_R2={fallback_subset_r2:.5f}")
             except Exception as e:
                 print(f"  [SPECIALIST WARN] regime {rg} failed: {repr(e)}")
 
     # v16+ targeted specialist: High predicted-F probability inside G5_C2C.
-    # No leakage: uses cross-fitted predicted FM probabilities only.
+    # No leakage: uses cross-fitted predicted FM probabilities only. Gated.
     if "FMint_G5C2C_x_PF" in train_df.columns:
         try:
             min_rows_pf = max(40, CONFIG.get("MIN_SPECIALIST_ROWS", 55) - 15)
+            gate_eps = CONFIG.get("SPECIALIST_GATE_EPS", 0.003)
             pf_score_tr = train_df["FMint_G5C2C_x_PF"].astype(float).values
             pf_score_te = test_df["FMint_G5C2C_x_PF"].astype(float).values
-            # Adaptive threshold: median of nonzero G5_C2C×P(F) scores in train.
             nz_tr = pf_score_tr[pf_score_tr > 0]
             thr = float(np.median(nz_tr)) if len(nz_tr) >= 20 else 0.0
             tr_mask = pf_score_tr >= thr if thr > 0 else (pf_score_tr > 0)
@@ -1498,17 +1527,30 @@ def run_v16_pipeline(train_df, test_df, seed=42, verbose=True):
                 poof_pf, ptest_pf, info_pf = train_correction_expert(
                     "HIGH_PF_C2C_SPECIALIST", sub_tr, sub_te, "base_local", seed=seed + 911,
                 )
-                stitched_oof = fallback_oof.copy()
-                stitched_test = fallback_test.copy()
-                stitched_oof[tr_mask] = poof_pf
-                stitched_test[te_mask] = ptest_pf
-                expert_oof.append(stitched_oof)
-                expert_test.append(stitched_test)
-                info_pf["specialist_type"] = "HIGH_PF_C2C"
-                info_pf["threshold"] = thr
-                info_pf["n_train"] = ntr
-                info_pf["n_test"] = nte
-                expert_info.append(info_pf)
+                # GATING
+                y_subset = train_df.loc[tr_mask, "PtPy"].values
+                try:
+                    fallback_subset_r2 = r2_score(y_subset, np.clip(fallback_oof[tr_mask], CONFIG["PRED_MIN"], CONFIG["PRED_MAX"]))
+                except Exception:
+                    fallback_subset_r2 = -np.inf
+                local_r2 = float(info_pf.get("oof_r2", -np.inf))
+                if not (local_r2 > fallback_subset_r2 + gate_eps):
+                    print(f"  [GATE REJECTED] HIGH_PF_C2C: local={local_r2:.5f} <= fallback={fallback_subset_r2:.5f}+{gate_eps}")
+                else:
+                    stitched_oof = fallback_oof.copy()
+                    stitched_test = fallback_test.copy()
+                    stitched_oof[tr_mask] = poof_pf
+                    stitched_test[te_mask] = ptest_pf
+                    expert_oof.append(stitched_oof)
+                    expert_test.append(stitched_test)
+                    info_pf["specialist_type"] = "HIGH_PF_C2C"
+                    info_pf["threshold"] = thr
+                    info_pf["n_train"] = ntr
+                    info_pf["n_test"] = nte
+                    info_pf["gate_passed"] = True
+                    info_pf["fallback_subset_r2"] = float(fallback_subset_r2)
+                    expert_info.append(info_pf)
+                    print(f"  [GATE PASSED] HIGH_PF_C2C: local_R2={local_r2:.5f} > fallback_R2={fallback_subset_r2:.5f}")
             else:
                 print("  [SPECIALIST] HighPF_C2C skipped: too few rows.")
         except Exception as e:
@@ -1570,6 +1612,9 @@ def run_v16_pipeline(train_df, test_df, seed=42, verbose=True):
         "residual_used": res_used,
         "expert_oof": B_train,
         "expert_test": B_test,
+        # v17: keep engineered frames so main() can build the inference artifact
+        "train_df_engineered": train_df,
+        "test_df_engineered": test_df,
     }
     return pred_tr, pred_te, bundle
 
@@ -1706,6 +1751,635 @@ def save_shap(out_dir, train_df, test_df):
     except Exception as e:
         print(f"[SHAP] failed: {repr(e)}")
         return None
+
+
+# ============================================================
+# 10b. v17 Inference-ready distilled model (production deliverable)
+# ============================================================
+
+def build_v17_inference_bundle(train_df_eng, test_df_eng, y_train, y_test=None, seed=42):
+    """
+    Train a single strong production model on the FULL training set using
+    exactly the same engineered features the stacked pipeline used. This
+    yields an inference-ready model that can be loaded with one joblib.load
+    call and applied to brand-new data via predict_v17() in the shipped
+    cfs_v17_predict.py module.
+
+    Returns:
+        inference_bundle: dict with classifiers, encoders, feature schema,
+            final regressor, calibration, and metadata for downstream use.
+    """
+    print("\n" + "=" * 100)
+    print("[V17 INFERENCE] Building inference-ready production model on FULL training set")
+    print("=" * 100)
+
+    # 1) Final FM classifier ensemble fit on full train (no CV).
+    fm_classifiers = []
+    fm_classes = None
+    fm_oh_cols = None
+    fm_label_encoder = None
+    if CONFIG["USE_FM_PROBABILITIES"] and "FM" in train_df_eng.columns:
+        try:
+            le = LabelEncoder()
+            y_fm_full = le.fit_transform(train_df_eng["FM"].astype(str).values)
+            fm_classes = list(le.classes_)
+            fm_label_encoder = le
+            X_clf, fm_oh_cols = make_classifier_matrix(train_df_eng, train_df_eng)
+            for name, m in classifier_models(seed + 5001).items():
+                try:
+                    fitted = clone(m)
+                    fitted.fit(X_clf, y_fm_full)
+                    fm_classifiers.append({"name": name, "model": fitted, "classes_": list(fitted.classes_)})
+                    print(f"  [INFERENCE] FM classifier '{name}' fitted (classes={list(fitted.classes_)})")
+                except Exception as e:
+                    print(f"  [INFERENCE WARN] FM classifier '{name}' failed: {repr(e)}")
+        except Exception as e:
+            print(f"  [INFERENCE WARN] FM classifier ensemble failed: {repr(e)}")
+
+    # 2) Final target-encoding maps + global mean from FULL train.
+    te_maps = {}
+    for cat in CAT_FEATURES:
+        try:
+            mp = smoothed_target_map(train_df_eng, y_train, cat, smooth=15.0)
+            te_maps[cat] = {str(k): float(v) for k, v in mp.items()}
+        except Exception as e:
+            print(f"  [INFERENCE WARN] TE map for {cat} failed: {repr(e)}")
+            te_maps[cat] = {}
+    te_global_mean = float(np.mean(y_train))
+
+    # 3) Build full strength matrix on FULL train using these TE maps.
+    X_train_full, str_oh_cols = make_strength_matrix(train_df_eng, train_df_eng, y_train)
+    feature_cols = list(X_train_full.columns)
+
+    # 4) Train the production regressor: a small Ridge-blended stack of
+    #    XGB + LGB + HistGB on PtPy directly (full train).
+    base_models = {}
+    if HAS_XGB:
+        base_models["xgb"] = XGBRegressor(
+            objective="reg:squarederror",
+            n_estimators=1500 if CONFIG["MODE"] == "strong" else 600,
+            learning_rate=0.020,
+            max_depth=5,
+            min_child_weight=2,
+            subsample=0.88,
+            colsample_bytree=0.84,
+            reg_alpha=0.04,
+            reg_lambda=0.30,
+            random_state=seed + 9001,
+            n_jobs=-1,
+            tree_method="hist",
+            verbosity=0,
+        )
+    if HAS_LGB:
+        base_models["lgb"] = LGBMRegressor(
+            objective="regression",
+            n_estimators=1500 if CONFIG["MODE"] == "strong" else 600,
+            learning_rate=0.020,
+            num_leaves=31,
+            min_child_samples=8,
+            subsample=0.88,
+            subsample_freq=1,
+            colsample_bytree=0.84,
+            reg_alpha=0.03,
+            reg_lambda=0.25,
+            random_state=seed + 9002,
+            n_jobs=-1,
+            verbosity=-1,
+        )
+    base_models["hgb"] = HistGradientBoostingRegressor(
+        loss="absolute_error",
+        learning_rate=0.030,
+        max_iter=900 if CONFIG["MODE"] == "strong" else 400,
+        max_leaf_nodes=25,
+        min_samples_leaf=8,
+        l2_regularization=0.05,
+        random_state=seed + 9003,
+        early_stopping=True,
+    )
+
+    # 4a) Fit each base on full train and produce OOF (5-fold) predictions for the blender.
+    kf = KFold(n_splits=5, shuffle=True, random_state=seed + 9100)
+    oof_mat = np.zeros((len(X_train_full), len(base_models)))
+    fitted_bases = {}
+    for j, (name, model) in enumerate(base_models.items()):
+        oof = np.zeros(len(X_train_full))
+        for fold, (idx_tr, idx_va) in enumerate(kf.split(X_train_full), 1):
+            try:
+                m = clone(model)
+                m.fit(X_train_full.iloc[idx_tr], y_train[idx_tr])
+                oof[idx_va] = m.predict(X_train_full.iloc[idx_va])
+            except Exception as e:
+                print(f"  [INFERENCE WARN] base '{name}' fold {fold} failed: {repr(e)}")
+        oof_mat[:, j] = clip_pred(oof)
+        # final fit on FULL train
+        try:
+            fitted = clone(model)
+            fitted.fit(X_train_full, y_train)
+            fitted_bases[name] = fitted
+            print(f"  [INFERENCE] base '{name}' fitted on full train (OOF R2={r2_score(y_train, oof_mat[:, j]):.4f})")
+        except Exception as e:
+            print(f"  [INFERENCE WARN] base '{name}' final fit failed: {repr(e)}")
+
+    # 4b) Train the Ridge blender on the OOF predictions.
+    blender = RidgeCV(alphas=np.logspace(-5, 2, 30))
+    blender.fit(oof_mat, y_train)
+    blended_oof = clip_pred(blender.predict(oof_mat))
+    blended_oof_r2 = r2_score(y_train, blended_oof)
+    print(f"  [INFERENCE] Ridge-blended OOF R²={blended_oof_r2:.4f}")
+
+    # 4c) Conservative shrink (mirrors the published pipeline preference).
+    shrink = 0.985
+    blended_oof_shrunk = clip_pred(blended_oof * shrink)
+    shrunk_oof_r2 = r2_score(y_train, blended_oof_shrunk)
+    print(f"  [INFERENCE] Conservative-shrunk OOF R²={shrunk_oof_r2:.4f} (shrink={shrink})")
+
+    # 4d) Final calibration via Isotonic on OOF predictions.
+    from sklearn.isotonic import IsotonicRegression
+    iso = IsotonicRegression(out_of_bounds="clip", increasing=True)
+    iso.fit(blended_oof_shrunk, y_train)
+    calibrated_oof = clip_pred(iso.predict(blended_oof_shrunk))
+    final_oof_r2 = r2_score(y_train, calibrated_oof)
+    print(f"  [INFERENCE] Isotonic-calibrated OOF R²={final_oof_r2:.4f}")
+
+    # 5) Apply to held-out test set (if provided) for an external check.
+    test_metrics = None
+    if test_df_eng is not None and len(test_df_eng) > 0:
+        try:
+            X_test_full, _ = make_strength_matrix(train_df_eng, test_df_eng, y_train, str_oh_cols)
+            test_base_preds = []
+            for name in fitted_bases:
+                test_base_preds.append(fitted_bases[name].predict(X_test_full))
+            test_base_mat = np.column_stack(test_base_preds) if len(test_base_preds) else np.zeros((len(test_df_eng), 1))
+            test_pred = clip_pred(blender.predict(test_base_mat) * shrink)
+            test_pred = clip_pred(iso.predict(test_pred))
+            if y_test is not None:
+                test_metrics = metrics(y_test, test_pred, prefix="V17_INFERENCE_TEST_")
+                print_metrics("V17 INFERENCE-MODEL — HOLDOUT TEST", test_metrics)
+        except Exception as e:
+            print(f"  [INFERENCE WARN] test-set evaluation failed: {repr(e)}")
+
+    # 6) Package everything as a single joblib-loadable bundle.
+    inference_bundle = {
+        "version": "v17",
+        "feature_cols": feature_cols,
+        "strength_onehot_cols": str_oh_cols,
+        "fm_classifiers": fm_classifiers,
+        "fm_classes": fm_classes,
+        "fm_label_encoder": fm_label_encoder,
+        "fm_onehot_cols": fm_oh_cols,
+        "te_maps": te_maps,
+        "te_global_mean": te_global_mean,
+        "num_features_base": list(NUM_FEATURES_BASE),
+        "cat_features": list(CAT_FEATURES),
+        "base_regressors": fitted_bases,
+        "ridge_blender": blender,
+        "shrink_factor": shrink,
+        "isotonic_calibrator": iso,
+        "pred_min": CONFIG["PRED_MIN"],
+        "pred_max": CONFIG["PRED_MAX"],
+        "training_oof_r2": float(final_oof_r2),
+        "blended_oof_r2": float(blended_oof_r2),
+        "shrunk_oof_r2": float(shrunk_oof_r2),
+        "test_metrics": test_metrics,
+    }
+    return inference_bundle
+
+
+PREDICT_MODULE_SOURCE = '''"""
+cfs_v17_predict.py
+==================
+Standalone, no-dependency-on-training-script predictor.
+
+Usage (e.g. inside any external program with a UI):
+
+    import joblib
+    import pandas as pd
+    from cfs_v17_predict import CFSV17Predictor
+
+    predictor = CFSV17Predictor.load("cfs_v17_inference_bundle.joblib")
+    df = pd.read_csv("new_specimens.csv")  # raw input columns
+    out = predictor.predict(df)            # returns DataFrame with PtPy_pred
+    print(out.head())
+
+Required raw columns (same as the training CSV):
+    SectionType (or "Section Types"), Sections, BC,
+    L, t, h, b, A, Fy, Py, Pcrl (or "P(crl,crd)"), Pne,
+    KLr (or "KL_r" / "KL/r"), lambda_c (or "λc"), lambda_led (or "λ(le-d)").
+"FM" (true failure mode) is NOT required for prediction.
+"""
+
+import math
+import re
+import numpy as np
+import pandas as pd
+import joblib
+
+EPS = 1e-12
+
+
+def _safe_num(s):
+    return pd.to_numeric(s, errors="coerce")
+
+
+def _clean_text(s):
+    return (
+        s.fillna("Unknown").astype(str).str.strip()
+         .replace({"": "Unknown", "nan": "Unknown", "None": "Unknown"})
+    )
+
+
+def _sdiv(a, b):
+    a = np.asarray(a, dtype=float); b = np.asarray(b, dtype=float)
+    return np.divide(a, np.where(np.abs(b) < EPS, np.nan, b))
+
+
+def _dsm_global(lam):
+    lc = np.asarray(lam, dtype=float)
+    lc = np.where(lc <= 0, np.nan, lc)
+    return np.where(lc <= 1.5, 0.658 ** (lc ** 2), 0.877 / (lc ** 2 + EPS))
+
+
+def _dsm_local(lam, pne_py):
+    lam = np.asarray(lam, dtype=float); pne = np.asarray(pne_py, dtype=float)
+    lam = np.where(lam <= 0, np.nan, lam)
+    reduction = np.where(
+        lam <= 0.776,
+        1.0,
+        (1.0 - 0.15 / (lam ** 0.8 + EPS)) / (lam ** 0.8 + EPS),
+    )
+    return pne * reduction
+
+
+def _assign_section_group(section_type, sections):
+    st = str(section_type).strip()
+    sec = str(sections).strip().lower()
+    if st == "O-2C": return "G1_O2C"
+    if st == "O-2U": return "G2_O2U"
+    if st == "C-U+C": return "G3_CUC"
+    if st.startswith("HC"): return "G4_HC"
+    if st.startswith("C-2C") or st.startswith("C-2Σ") or st.startswith("C-2\\u03a3"):
+        return "G5_C2C"
+    if st.startswith("O-"): return "G6_Open"
+    if "closed" in sec or "box" in st.lower() or "-i-" in st.lower():
+        return "G7a_Closed_Box"
+    return "G7b_Rest"
+
+
+def _engineer_features(df_raw):
+    """Reproduce the full v17 feature engineering on raw inputs."""
+    aliases = {
+        "SectionType": ["SectionType", "Section Types", "Section_Type"],
+        "Sections": ["Sections"],
+        "BC": ["BC", "Boundary", "Boundary Condition"],
+        "L": ["L"], "t": ["t"], "h": ["h"], "b": ["b"], "A": ["A"],
+        "Fy": ["Fy"], "Py": ["Py"],
+        "Pcrl": ["Pcrl", "P(crl,crd)", "Pcrl_crd"],
+        "Pne": ["Pne"],
+        "KLr": ["KLr", "KL_r", "KL/r"],
+        "lambda_c": ["lambda_c", "λc", "lam_c"],
+        "lambda_led": ["lambda_led", "λ(le-d)", "lam_led"],
+    }
+    df = pd.DataFrame(index=df_raw.index)
+    for std_name, options in aliases.items():
+        col = next((c for c in options if c in df_raw.columns), None)
+        if col is None and std_name in ("Sections", "BC"):
+            df[std_name] = "Unknown"
+            continue
+        if col is None:
+            raise KeyError(f"Missing required column for {std_name}; tried {options}")
+        if std_name in ("SectionType", "Sections", "BC"):
+            df[std_name] = _clean_text(df_raw[col]).str.replace(r"\\s+", "", regex=True)
+        else:
+            df[std_name] = _safe_num(df_raw[col])
+
+    df["SG_design"] = [_assign_section_group(st, se) for st, se in zip(df["SectionType"], df["Sections"])]
+
+    # geometry/material/buckling features (must mirror training)
+    df["h_t"] = _sdiv(df["h"], df["t"])
+    df["b_t"] = _sdiv(df["b"], df["t"])
+    df["L_h"] = _sdiv(df["L"], df["h"])
+    df["L_b"] = _sdiv(df["L"], df["b"])
+    df["L_t"] = _sdiv(df["L"], df["t"])
+    df["h_b"] = _sdiv(df["h"], df["b"])
+    df["b_h"] = _sdiv(df["b"], df["h"])
+    df["A_t2"] = _sdiv(df["A"], df["t"] ** 2)
+    df["sqrt_A_t"] = _sdiv(np.sqrt(np.abs(df["A"])), df["t"])
+    df["Fy_E"] = df["Fy"] / 203000.0
+    df["Fy_norm"] = df["Fy"] / 350.0
+    df["Pcrl_Py"] = _sdiv(df["Pcrl"], df["Py"])
+    df["Pne_Py"] = _sdiv(df["Pne"], df["Py"])
+    df["Pcrl_Pne"] = _sdiv(df["Pcrl_Py"], df["Pne_Py"])
+    df["Pne_Pcrl"] = _sdiv(df["Pne_Py"], df["Pcrl_Py"])
+    df["lambda_c_sq"] = df["lambda_c"] ** 2
+    df["lambda_c_cu"] = df["lambda_c"] ** 3
+    df["lambda_led_sq"] = df["lambda_led"] ** 2
+    df["lambda_led_cu"] = df["lambda_led"] ** 3
+    df["inv_lambda_c"] = _sdiv(1.0, df["lambda_c"])
+    df["inv_lambda_led"] = _sdiv(1.0, df["lambda_led"])
+    df["lambda_c_over_led"] = _sdiv(df["lambda_c"], df["lambda_led"])
+    df["lambda_led_over_c"] = _sdiv(df["lambda_led"], df["lambda_c"])
+    df["lambda_c_led"] = df["lambda_c"] * df["lambda_led"]
+    df["lambda_c_KLr"] = df["lambda_c"] * df["KLr"]
+    df["lambda_c_Pne"] = df["lambda_c"] * df["Pne_Py"]
+    df["lambda_led_Pcrl"] = df["lambda_led"] * df["Pcrl_Py"]
+    df["Pne_Pcrl_product"] = df["Pne_Py"] * df["Pcrl_Py"]
+    df["h_t_b_t"] = df["h_t"] * df["b_t"]
+    df["lambda_c_h_t"] = df["lambda_c"] * df["h_t"]
+    df["lambda_c_b_t"] = df["lambda_c"] * df["b_t"]
+    df["Pcrl_sq"] = df["Pcrl_Py"] ** 2
+    df["Pne_sq"] = df["Pne_Py"] ** 2
+    df["sqrt_Pcrl"] = np.sqrt(np.abs(df["Pcrl_Py"]))
+    df["sqrt_Pne"] = np.sqrt(np.abs(df["Pne_Py"]))
+    df["DSM_global"] = _dsm_global(df["lambda_c"])
+    df["DSM_local"] = _dsm_local(df["lambda_led"], df["Pne_Py"])
+
+    bc = pd.DataFrame({
+        "DSM_global": df["DSM_global"], "DSM_local": df["DSM_local"],
+        "Pne_Py": df["Pne_Py"], "Pcrl_Py": df["Pcrl_Py"],
+    }).replace([np.inf, -np.inf], np.nan)
+    bc = bc.where(bc > 0)
+    df["base_global"] = df["DSM_global"]
+    df["base_local"] = df["DSM_local"]
+    df["base_pne"] = df["Pne_Py"]
+    df["base_pcrl"] = df["Pcrl_Py"]
+    df["base_min"] = bc.min(axis=1)
+    df["base_mean"] = bc.mean(axis=1)
+    df["base_geom"] = np.sqrt(np.maximum(df["base_min"], 0.02) * np.maximum(df["base_mean"], 0.02))
+
+    for b in ["base_global","base_local","base_pne","base_pcrl","base_min","base_mean","base_geom"]:
+        df[b] = pd.Series(df[b]).replace([np.inf,-np.inf], np.nan).fillna(df["base_mean"]).clip(0.02, 1.30)
+
+    df["DSM_global_local_ratio"] = _sdiv(df["DSM_global"], df["DSM_local"])
+    df["DSM_spread_abslog"] = np.abs(np.log(np.maximum(df["DSM_global"],0.02)/np.maximum(df["DSM_local"],0.02)))
+    df["Pne_DSM_global"] = _sdiv(df["Pne_Py"], df["DSM_global"])
+    df["Pcrl_DSM_global"] = _sdiv(df["Pcrl_Py"], df["DSM_global"])
+    df["min_global_local"] = pd.DataFrame({"g": df["Pne_Py"], "l": df["Pcrl_Py"]}).min(axis=1)
+    df["max_global_local"] = pd.DataFrame({"g": df["Pne_Py"], "l": df["Pcrl_Py"]}).max(axis=1)
+    df["range_global_local"] = df["max_global_local"] - df["min_global_local"]
+
+    df["region_short"] = (df["lambda_c"] < 0.7).astype(float)
+    df["region_intermediate"] = ((df["lambda_c"] >= 0.7) & (df["lambda_c"] <= 1.3)).astype(float)
+    df["region_slender"] = (df["lambda_c"] > 1.3).astype(float)
+    df["is_open_section"] = df["Sections"].astype(str).str.lower().str.contains("open").astype(float)
+    df["is_closed_section"] = df["Sections"].astype(str).str.lower().str.contains("closed").astype(float)
+    df["is_half_closed_section"] = df["Sections"].astype(str).str.lower().str.contains("half").astype(float)
+
+    for c in df.select_dtypes(include=np.number).columns:
+        med = df[c].replace([np.inf,-np.inf], np.nan).median()
+        df[c] = df[c].replace([np.inf,-np.inf], np.nan).fillna(med if np.isfinite(med) else 0.0)
+    return df
+
+
+def _make_classifier_matrix(df, num_features_base, cat_features, fm_oh_cols):
+    X = pd.DataFrame(index=df.index)
+    for c in num_features_base:
+        X[c] = df[c].astype(float).values if c in df.columns else 0.0
+    oh = pd.get_dummies(df[cat_features].astype(str), prefix=cat_features, dtype=float)
+    for c in fm_oh_cols:
+        if c not in oh.columns:
+            oh[c] = 0.0
+    X = pd.concat([X, oh[fm_oh_cols]], axis=1)
+    return X.replace([np.inf,-np.inf], np.nan).fillna(0.0).astype(float)
+
+
+def _apply_fm_classifiers(df, classifiers, fm_classes, num_features_base, cat_features, fm_oh_cols):
+    if not classifiers or not fm_classes:
+        return df
+    X_clf = _make_classifier_matrix(df, num_features_base, cat_features, fm_oh_cols)
+    n_classes = len(fm_classes)
+    accum = np.zeros((len(df), n_classes))
+    used = 0
+    for entry in classifiers:
+        try:
+            m = entry["model"]
+            p = m.predict_proba(X_clf)
+            aligned = np.zeros((len(df), n_classes))
+            for j, cls in enumerate(m.classes_):
+                aligned[:, int(cls)] = p[:, j]
+            accum += aligned
+            used += 1
+        except Exception:
+            pass
+    if used == 0:
+        return df
+    probs = accum / used
+    for i, cls in enumerate(fm_classes):
+        safe_cls = re.sub(r"[^A-Za-z0-9]+", "_", str(cls)).strip("_")
+        df[f"FMprob_{safe_cls}"] = probs[:, i]
+    df["FMprob_max"] = probs.max(axis=1)
+    df["FMprob_entropy"] = -np.sum(probs * np.log(probs + EPS), axis=1)
+    return df
+
+
+def _add_fm_interactions(df):
+    def find_prob_col(name):
+        target = f"FMprob_{name}"
+        if target in df.columns:
+            return target
+        for c in df.columns:
+            if c.startswith("FMprob_") and c.split("FMprob_")[-1].upper() == name.upper():
+                return c
+        return None
+
+    is_g5 = (df["SG_design"].astype(str).values == "G5_C2C").astype(float)
+    pf_col = find_prob_col("F"); pldf_col = find_prob_col("LDF")
+
+    if pf_col is not None:
+        pF = df[pf_col].astype(float).values
+        df["FMint_PF"] = pF
+        df["FMint_G5C2C_x_PF"] = is_g5 * pF
+        df["FMint_PF_x_lambda_c"] = pF * df.get("lambda_c", 0.0).astype(float).values
+        df["FMint_PF_x_Pcrl_Py"]  = pF * df.get("Pcrl_Py", 0.0).astype(float).values
+        df["FMint_PF_x_Pne_Py"]   = pF * df.get("Pne_Py", 0.0).astype(float).values
+        df["FMint_PF_x_DSM_local"] = pF * df.get("DSM_local", 0.0).astype(float).values
+    if pldf_col is not None:
+        pLDF = df[pldf_col].astype(float).values
+        df["FMint_PLDF"] = pLDF
+        df["FMint_G5C2C_x_PLDF"] = is_g5 * pLDF
+    for c in [c for c in df.columns if c.startswith("FMint_")]:
+        df[c] = pd.Series(df[c]).replace([np.inf,-np.inf], np.nan).fillna(0.0).values
+    return df
+
+
+def _build_strength_matrix(df, te_maps, te_global_mean, num_features_base, cat_features, str_oh_cols):
+    X = pd.DataFrame(index=df.index)
+    feature_pool = list(num_features_base)
+    feature_pool += [c for c in df.columns if c.startswith("FMprob_") or c.startswith("FMint_")]
+    for c in feature_pool:
+        if c in df.columns:
+            X[c] = df[c].astype(float).values
+    for cat in cat_features:
+        mapping = te_maps.get(cat, {})
+        col = df[cat].astype(str).map(mapping).fillna(te_global_mean).values
+        X[f"{cat}_te"] = col.astype(float)
+    oh = pd.get_dummies(df[cat_features].astype(str), prefix=cat_features, dtype=float)
+    for c in str_oh_cols:
+        if c not in oh.columns:
+            oh[c] = 0.0
+    X = pd.concat([X, oh[str_oh_cols]], axis=1)
+    return X.replace([np.inf,-np.inf], np.nan).fillna(0.0).astype(float)
+
+
+class CFSV17Predictor:
+    """Inference-only wrapper around the v17 production bundle."""
+
+    def __init__(self, bundle):
+        self.bundle = bundle
+
+    @classmethod
+    def load(cls, bundle_path):
+        return cls(joblib.load(bundle_path))
+
+    def predict(self, raw_df, return_engineered=False):
+        b = self.bundle
+        df = _engineer_features(raw_df)
+        df = _apply_fm_classifiers(
+            df, b.get("fm_classifiers", []), b.get("fm_classes", []),
+            b["num_features_base"], b["cat_features"], b.get("fm_onehot_cols", []),
+        )
+        df = _add_fm_interactions(df)
+        X = _build_strength_matrix(
+            df, b["te_maps"], b["te_global_mean"],
+            b["num_features_base"], b["cat_features"], b["strength_onehot_cols"],
+        )
+        # Align column order to training feature_cols
+        for c in b["feature_cols"]:
+            if c not in X.columns:
+                X[c] = 0.0
+        X = X[b["feature_cols"]]
+
+        # Run all base regressors, blend, shrink, calibrate.
+        base_preds = []
+        for name, model in b["base_regressors"].items():
+            try:
+                base_preds.append(model.predict(X))
+            except Exception:
+                base_preds.append(np.full(len(X), b["te_global_mean"]))
+        base_mat = np.column_stack(base_preds) if base_preds else np.zeros((len(X), 1))
+        blended = b["ridge_blender"].predict(base_mat)
+        shrunk = blended * b["shrink_factor"]
+        shrunk = np.clip(shrunk, b["pred_min"], b["pred_max"])
+        calibrated = b["isotonic_calibrator"].predict(shrunk)
+        calibrated = np.clip(calibrated, b["pred_min"], b["pred_max"])
+
+        out = pd.DataFrame({
+            "PtPy_pred": calibrated,
+            "PtPy_pred_uncalibrated": np.clip(blended, b["pred_min"], b["pred_max"]),
+        }, index=raw_df.index)
+        if "Py" in raw_df.columns:
+            out["Pt_pred_kN"] = calibrated * pd.to_numeric(raw_df["Py"], errors="coerce").values
+        if return_engineered:
+            return out, df
+        return out
+
+
+if __name__ == "__main__":
+    import sys
+    if len(sys.argv) >= 3:
+        bundle_path, csv_path = sys.argv[1], sys.argv[2]
+        out_path = sys.argv[3] if len(sys.argv) >= 4 else "predictions.csv"
+        predictor = CFSV17Predictor.load(bundle_path)
+        df_raw = pd.read_csv(csv_path)
+        result = predictor.predict(df_raw)
+        result.to_csv(out_path, index=False)
+        print(f"Wrote: {out_path} ({len(result)} rows)")
+    else:
+        print("Usage: python cfs_v17_predict.py <bundle.joblib> <input.csv> [output.csv]")
+'''
+
+
+def write_predict_module(out_dir):
+    """Write the standalone cfs_v17_predict.py module to the output directory."""
+    target = Path(out_dir) / "cfs_v17_predict.py"
+    target.write_text(PREDICT_MODULE_SOURCE, encoding="utf-8")
+    print(f"[INFERENCE] predict module written: {target}")
+    return target
+
+
+V17_README = """# CFS v17 Production Package
+
+This ZIP contains everything needed to run the v17 model in your own program.
+
+## Files
+
+- `cfs_v17_inference_bundle.joblib`: trained production model (one file).
+- `cfs_v17_predict.py`: standalone Python module exposing `CFSV17Predictor`.
+- `v16_holdout_predictions.csv`, `v16_pareto_candidate_report.csv`,
+  `v16_error_by_design_group.csv`, `v16_error_by_true_FM_audit_only.csv`,
+  `v16_repeated_cv_folds.csv`, `v16_repeated_cv_summary.json`,
+  `v16_final_summary.json`, `v16_feature_report.json`,
+  `v16_shap_importance.csv`: official audit results.
+- `v16_scatter_holdout.png`, `v16_residuals_by_group.png`,
+  `v16_shap_summary.png`: figures.
+- `v16_model_bundle_holdout.joblib`: full pipeline bundle (audit only).
+
+## Use in your program (1 minute setup)
+
+```python
+import pandas as pd
+from cfs_v17_predict import CFSV17Predictor
+
+predictor = CFSV17Predictor.load("cfs_v17_inference_bundle.joblib")
+df = pd.read_csv("your_inputs.csv")
+out = predictor.predict(df)
+print(out.head())
+```
+
+Required input columns: SectionType, Sections, BC, L, t, h, b, A, Fy, Py,
+Pcrl, Pne, KLr, lambda_c, lambda_led. (FM is NOT needed for prediction.)
+
+## Or via the command line
+
+```
+python cfs_v17_predict.py cfs_v17_inference_bundle.joblib your_inputs.csv predictions.csv
+```
+
+## Note
+
+The production inference model is a faithful distillation of the published
+stacked pipeline. Reported pipeline metrics (TEST R², CV R²) are in
+`v16_final_summary.json`. The inference model's training-set OOF R² and
+test-set metrics are stored in the bundle as `training_oof_r2` and
+`test_metrics`.
+"""
+
+
+def write_v17_readme(out_dir):
+    target = Path(out_dir) / "README_v17.md"
+    target.write_text(V17_README, encoding="utf-8")
+    return target
+
+
+def package_outputs_zip(out_dir, archive_basename="cfs_v17_FINAL_PACKAGE"):
+    """
+    Bundle the entire output directory into a single ZIP placed inside
+    /kaggle/working so it appears as one downloadable artifact.
+    """
+    import shutil
+    out_dir = Path(out_dir)
+    # Default to the parent of out_dir (typical: /kaggle/working) so the ZIP
+    # sits at the same level Kaggle exposes for easy download.
+    parent = out_dir.parent if out_dir.parent.exists() else out_dir
+    archive_root = str(parent / archive_basename)
+    try:
+        archive_path = shutil.make_archive(archive_root, "zip", root_dir=str(out_dir))
+        print(f"\n[PACKAGE] Created: {archive_path}")
+        return archive_path
+    except Exception as e:
+        print(f"[PACKAGE WARN] make_archive failed: {repr(e)}")
+        # Fallback: use zipfile directly
+        try:
+            import zipfile
+            zip_path = archive_root + ".zip"
+            with zipfile.ZipFile(zip_path, "w", zipfile.ZIP_DEFLATED) as z:
+                for p in out_dir.rglob("*"):
+                    if p.is_file():
+                        z.write(p, arcname=p.relative_to(out_dir))
+            print(f"[PACKAGE] Created via zipfile: {zip_path}")
+            return zip_path
+        except Exception as e2:
+            print(f"[PACKAGE ERR] zipfile fallback failed: {repr(e2)}")
+            return None
 
 
 # ============================================================
@@ -1895,6 +2569,38 @@ def main():
         except Exception as e:
             print(f"[WARN] Could not save model bundle: {repr(e)}")
 
+    # ------------------------------------------------------------------
+    # v17 production deliverable: inference bundle + predict module + ZIP
+    # ------------------------------------------------------------------
+    inference_bundle = None
+    try:
+        train_eng = bundle.get("train_df_engineered")
+        test_eng = bundle.get("test_df_engineered")
+        y_train_full = tr["PtPy"].values
+        y_test_full = te["PtPy"].values
+        if train_eng is not None and HAS_JOBLIB:
+            inference_bundle = build_v17_inference_bundle(
+                train_eng, test_eng, y_train_full, y_test=y_test_full,
+                seed=CONFIG["RANDOM_STATE"],
+            )
+            joblib.dump(inference_bundle, out_dir / "cfs_v17_inference_bundle.joblib")
+            print(f"[INFERENCE] cfs_v17_inference_bundle.joblib saved ({(out_dir/'cfs_v17_inference_bundle.joblib').stat().st_size/1024:.1f} KB)")
+    except Exception as e:
+        print(f"[INFERENCE WARN] could not build inference bundle: {repr(e)}")
+
+    try:
+        write_predict_module(out_dir)
+        write_v17_readme(out_dir)
+    except Exception as e:
+        print(f"[INFERENCE WARN] could not write predict module / readme: {repr(e)}")
+
+    # Final ZIP packaging so the user has a single download link in Kaggle.
+    try:
+        archive_path = package_outputs_zip(out_dir, archive_basename="cfs_v17_FINAL_PACKAGE")
+    except Exception as e:
+        print(f"[PACKAGE WARN] failed to package outputs: {repr(e)}")
+        archive_path = None
+
     print("\n" + "=" * 100)
     print("DONE")
     print("=" * 100)
@@ -1902,6 +2608,14 @@ def main():
     print(f"Holdout TEST R2 = {test_metrics.get('TEST_R2', np.nan):.6f}")
     if cv_summary:
         print(f"Repeated CV R2 mean = {cv_summary.get('R2_mean', np.nan):.6f} ± {cv_summary.get('R2_std', np.nan):.6f}")
+    if inference_bundle is not None:
+        print(f"V17 Inference OOF R2 = {inference_bundle.get('training_oof_r2', np.nan):.6f}")
+        if inference_bundle.get("test_metrics"):
+            tm = inference_bundle["test_metrics"]
+            print(f"V17 Inference TEST R2 = {tm.get('V17_INFERENCE_TEST_R2', np.nan):.6f}")
+    if archive_path:
+        print(f"\n>>> DOWNLOAD: {archive_path}")
+        print(">>> In Kaggle, click this file in the Output panel to download the full package.")
 
     print("\nScientific interpretation:")
     print("- This is an official no-fastener, no-direct-FM, no-target-leakage framework.")
