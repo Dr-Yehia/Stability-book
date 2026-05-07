@@ -247,6 +247,41 @@ def print_metrics(title, d):
         else:
             print(f"{k:36s}: {v}")
 
+def to_json_safe(obj, _seen=None):
+    """
+    Recursively convert objects to JSON-serializable equivalents.
+    Drops non-serializable model objects (e.g. RidgeCV, HuberRegressor),
+    numpy arrays, and DataFrames, replacing them with a short type tag.
+    """
+    if _seen is None:
+        _seen = set()
+    if obj is None or isinstance(obj, (bool, int, str)):
+        return obj
+    if isinstance(obj, float):
+        return obj if math.isfinite(obj) else None
+    if isinstance(obj, (np.integer,)):
+        return int(obj)
+    if isinstance(obj, (np.floating,)):
+        v = float(obj)
+        return v if math.isfinite(v) else None
+    if isinstance(obj, (np.bool_,)):
+        return bool(obj)
+    oid = id(obj)
+    if oid in _seen:
+        return f"<circular:{type(obj).__name__}>"
+    _seen.add(oid)
+    if isinstance(obj, dict):
+        return {str(k): to_json_safe(v, _seen) for k, v in obj.items()}
+    if isinstance(obj, (list, tuple, set)):
+        return [to_json_safe(v, _seen) for v in obj]
+    if isinstance(obj, np.ndarray):
+        return f"<ndarray shape={obj.shape} dtype={obj.dtype}>"
+    if isinstance(obj, pd.DataFrame):
+        return f"<DataFrame shape={obj.shape}>"
+    if isinstance(obj, pd.Series):
+        return f"<Series len={len(obj)}>"
+    return f"<{type(obj).__name__}>"
+
 def dsm_global(lambda_c):
     lc = np.asarray(lambda_c, dtype=float)
     lc = np.where(lc <= 0, np.nan, lc)
@@ -720,8 +755,84 @@ def strength_numeric_cols(df):
     cols = list(NUM_FEATURES_BASE)
     if CONFIG["USE_FM_PROBABILITIES"]:
         cols += [c for c in df.columns if c.startswith("FMprob_")]
+        # v16+ targeted no-leakage interactions (predicted FM x design group / mechanics).
+        cols += [c for c in df.columns if c.startswith("FMint_")]
     # True FM is intentionally not added.
     return [c for c in cols if c in df.columns]
+
+
+def add_predicted_fm_interactions(train_df, test_df, fm_info):
+    """
+    Build no-leakage interaction features using PREDICTED failure-mode
+    probabilities (cross-fitted) and design-only signals. The true FM
+    label is never used here. These features specifically target the
+    G5_C2C + predicted-F bottleneck.
+    """
+    if not fm_info or not fm_info.get("used", False):
+        return train_df, test_df
+
+    train_df = train_df.copy()
+    test_df = test_df.copy()
+
+    # Locate FM probability columns we have available.
+    def find_prob_col(df, fm_name):
+        target = f"FMprob_{fm_name}"
+        if target in df.columns:
+            return target
+        for c in df.columns:
+            if c.startswith("FMprob_") and c.split("FMprob_")[-1].upper() == fm_name.upper():
+                return c
+        return None
+
+    pf_tr = find_prob_col(train_df, "F")
+    pf_te = find_prob_col(test_df, "F")
+    pldf_tr = find_prob_col(train_df, "LDF")
+    pldf_te = find_prob_col(test_df, "LDF")
+
+    def safe_get(df, name):
+        return df[name].astype(float).values if name in df.columns else np.zeros(len(df))
+
+    is_g5_tr = (train_df["SG_design"].astype(str).values == "G5_C2C").astype(float)
+    is_g5_te = (test_df["SG_design"].astype(str).values == "G5_C2C").astype(float)
+
+    if pf_tr is not None and pf_te is not None:
+        pF_tr = safe_get(train_df, pf_tr)
+        pF_te = safe_get(test_df, pf_te)
+
+        train_df["FMint_PF"] = pF_tr
+        test_df["FMint_PF"] = pF_te
+
+        train_df["FMint_G5C2C_x_PF"] = is_g5_tr * pF_tr
+        test_df["FMint_G5C2C_x_PF"] = is_g5_te * pF_te
+
+        train_df["FMint_PF_x_lambda_c"] = pF_tr * safe_get(train_df, "lambda_c")
+        test_df["FMint_PF_x_lambda_c"] = pF_te * safe_get(test_df, "lambda_c")
+
+        train_df["FMint_PF_x_Pcrl_Py"] = pF_tr * safe_get(train_df, "Pcrl_Py")
+        test_df["FMint_PF_x_Pcrl_Py"] = pF_te * safe_get(test_df, "Pcrl_Py")
+
+        train_df["FMint_PF_x_Pne_Py"] = pF_tr * safe_get(train_df, "Pne_Py")
+        test_df["FMint_PF_x_Pne_Py"] = pF_te * safe_get(test_df, "Pne_Py")
+
+        train_df["FMint_PF_x_DSM_local"] = pF_tr * safe_get(train_df, "DSM_local")
+        test_df["FMint_PF_x_DSM_local"] = pF_te * safe_get(test_df, "DSM_local")
+
+    if pldf_tr is not None and pldf_te is not None:
+        pLDF_tr = safe_get(train_df, pldf_tr)
+        pLDF_te = safe_get(test_df, pldf_te)
+
+        train_df["FMint_PLDF"] = pLDF_tr
+        test_df["FMint_PLDF"] = pLDF_te
+
+        train_df["FMint_G5C2C_x_PLDF"] = is_g5_tr * pLDF_tr
+        test_df["FMint_G5C2C_x_PLDF"] = is_g5_te * pLDF_te
+
+    # Sanitize any NaN/Inf produced by interactions.
+    for c in [c for c in train_df.columns if c.startswith("FMint_")]:
+        train_df[c] = pd.Series(train_df[c]).replace([np.inf, -np.inf], np.nan).fillna(0.0).values
+        test_df[c] = pd.Series(test_df[c]).replace([np.inf, -np.inf], np.nan).fillna(0.0).values
+
+    return train_df, test_df
 
 def make_strength_matrix(fit_df, apply_df, y_fit_for_te, onehot_cols=None):
     X = pd.DataFrame(index=apply_df.index)
@@ -1068,6 +1179,32 @@ def build_meta_candidates(B_train, y_train, B_test, expert_names):
             "model": {"type": "weighted_average", "indices": idx, "weights": w.tolist()},
         })
 
+    # Trim-mean of top-k experts: drop the most extreme expert per row to
+    # reduce tail-induced bias on hard cases (e.g., G5_C2C/F outliers).
+    for k in [5, 7, min(9, B_train.shape[1])]:
+        if k <= 3 or k > B_train.shape[1]:
+            continue
+        idx = order[:k]
+        sub_tr = B_train[:, idx]
+        sub_te = B_test[:, idx]
+        med_tr = np.median(sub_tr, axis=1, keepdims=True)
+        med_te = np.median(sub_te, axis=1, keepdims=True)
+        # Index of farthest-from-median per row, masked out in the mean.
+        far_tr = np.argmax(np.abs(sub_tr - med_tr), axis=1)
+        far_te = np.argmax(np.abs(sub_te - med_te), axis=1)
+        keep_tr = np.ones_like(sub_tr, dtype=bool)
+        keep_te = np.ones_like(sub_te, dtype=bool)
+        keep_tr[np.arange(len(sub_tr)), far_tr] = False
+        keep_te[np.arange(len(sub_te)), far_te] = False
+        p_tr_trim = (sub_tr * keep_tr).sum(axis=1) / keep_tr.sum(axis=1)
+        p_te_trim = (sub_te * keep_te).sum(axis=1) / keep_te.sum(axis=1)
+        candidates.append({
+            "name": f"trimmean::top{k}",
+            "p_tr": p_tr_trim,
+            "p_te": p_te_trim,
+            "model": {"type": "trim_mean", "indices": idx, "drop_per_row": 1},
+        })
+
     # Slight conservative variants of the best single/stack candidates.
     # These may reduce unsafe overprediction and improve journal safety metrics.
     base_candidates = list(candidates)
@@ -1104,24 +1241,67 @@ def nonnegative_blend(B_train, y_train, B_test):
     return clip_pred(meta.predict(B_train)), clip_pred(meta.predict(B_test)), meta, "RidgeCV"
 
 def calibrate_oof(y_train, p_train, p_test):
-    try:
-        cal = HuberRegressor(epsilon=1.35, alpha=1e-4)
-        cal.fit(np.asarray(p_train).reshape(-1, 1), y_train)
-    except Exception:
-        cal = LinearRegression()
-        cal.fit(np.asarray(p_train).reshape(-1, 1), y_train)
+    """
+    Try multiple calibration models (Huber, Linear, Isotonic) and pick the
+    one that improves the multi-objective Pareto score most while not
+    losing meaningful R2. Isotonic is monotone and tends to fix tail bias
+    without hurting bulk fit, which is helpful for the G5_C2C/F long tail.
+    """
+    p_train_a = np.asarray(p_train, dtype=float).reshape(-1, 1)
+    p_test_a = np.asarray(p_test, dtype=float).reshape(-1, 1)
 
-    p_tr_cal = clip_pred(cal.predict(np.asarray(p_train).reshape(-1, 1)))
-    p_te_cal = clip_pred(cal.predict(np.asarray(p_test).reshape(-1, 1)))
+    candidates = []
+
+    try:
+        cal_h = HuberRegressor(epsilon=1.35, alpha=1e-4)
+        cal_h.fit(p_train_a, y_train)
+        candidates.append(("huber", cal_h,
+                           clip_pred(cal_h.predict(p_train_a)),
+                           clip_pred(cal_h.predict(p_test_a))))
+    except Exception:
+        pass
+
+    try:
+        cal_l = LinearRegression()
+        cal_l.fit(p_train_a, y_train)
+        candidates.append(("linear", cal_l,
+                           clip_pred(cal_l.predict(p_train_a)),
+                           clip_pred(cal_l.predict(p_test_a))))
+    except Exception:
+        pass
+
+    try:
+        from sklearn.isotonic import IsotonicRegression
+        cal_i = IsotonicRegression(out_of_bounds="clip", increasing=True)
+        cal_i.fit(np.asarray(p_train, dtype=float), np.asarray(y_train, dtype=float))
+        candidates.append(("isotonic", cal_i,
+                           clip_pred(cal_i.predict(np.asarray(p_train, dtype=float))),
+                           clip_pred(cal_i.predict(np.asarray(p_test, dtype=float)))))
+    except Exception as e:
+        print(f"[CALIBRATION] isotonic skipped: {repr(e)}")
 
     raw = multiobjective_metrics(y_train, p_train)
-    new = multiobjective_metrics(y_train, p_tr_cal)
+    best = None
+    best_score = raw["ParetoScore"] - 1e-5
+    for name, model, p_tr_cal, p_te_cal in candidates:
+        m = multiobjective_metrics(y_train, p_tr_cal)
+        if m["R2"] < raw["R2"] - 0.002:
+            continue
+        if m["ParetoScore"] > best_score:
+            best = (name, model, p_tr_cal, p_te_cal, m)
+            best_score = m["ParetoScore"]
 
-    use = (new["ParetoScore"] >= raw["ParetoScore"] - 1e-5) and (new["R2"] >= raw["R2"] - 0.002)
-    return (p_tr_cal, p_te_cal, cal, True) if use else (p_train, p_test, cal, False)
+    if best is None:
+        # Return the first candidate as the (unused) calibration model.
+        cal_obj = candidates[0][1] if candidates else None
+        return p_train, p_test, cal_obj, False
+
+    name, model, p_tr_cal, p_te_cal, m = best
+    print(f"[CALIBRATION] selected={name} | ParetoScore raw={raw['ParetoScore']:.6f} -> {m['ParetoScore']:.6f} | R2 raw={raw['R2']:.6f} -> {m['R2']:.6f}")
+    return p_tr_cal, p_te_cal, model, True
 
 def residual_correction(train_df, test_df, y_train, p_train, p_test, seed=42):
-    print("\n[RESIDUAL] Cross-fitted residual correction")
+    print("\n[RESIDUAL] Cross-fitted residual correction (with FM-entropy / hard-zone weights)")
     residual = y_train - p_train
     kf = KFold(n_splits=min(CONFIG["INNER_FOLDS"], max(3, len(train_df) // 35)), shuffle=True, random_state=seed + 100)
 
@@ -1145,6 +1325,22 @@ def residual_correction(train_df, test_df, y_train, p_train, p_test, seed=42):
         ),
     }
 
+    # No-leakage sample weights:
+    #   - Higher weight where FM is uncertain (high entropy of predicted FM).
+    #   - Higher weight on G5_C2C with high predicted P(F) (the audit-found bottleneck).
+    # These quantities are derived from cross-fitted predictions on TRAIN only.
+    sw = np.ones(len(train_df), dtype=float)
+    if "FMprob_entropy" in train_df.columns:
+        ent = train_df["FMprob_entropy"].astype(float).values
+        ent = np.clip(ent, 0.0, np.nanpercentile(ent, 99.5) if np.isfinite(ent).any() else 1.0)
+        ent_n = (ent - np.min(ent)) / (np.ptp(ent) + EPS)
+        sw *= (1.0 + 0.6 * ent_n)
+    if "FMint_G5C2C_x_PF" in train_df.columns:
+        z = train_df["FMint_G5C2C_x_PF"].astype(float).values
+        z_n = z / (np.max(z) + EPS) if np.max(z) > 0 else z
+        sw *= (1.0 + 0.8 * z_n)
+    sw = np.clip(sw, 0.5, 3.5)
+
     res_oof_total = np.zeros(len(train_df))
     res_test_total = np.zeros(len(test_df))
 
@@ -1162,7 +1358,10 @@ def residual_correction(train_df, test_df, y_train, p_train, p_test, seed=42):
             X_test, _ = make_strength_matrix(fit_df, test_df, y_fit_strength, oh_cols)
 
             m = clone(model)
-            m.fit(X_fit, residual[idx_tr])
+            try:
+                m.fit(X_fit, residual[idx_tr], sample_weight=sw[idx_tr])
+            except TypeError:
+                m.fit(X_fit, residual[idx_tr])
             res_oof[idx_va] = m.predict(X_val)
             res_test_folds.append(m.predict(X_test))
 
@@ -1192,6 +1391,8 @@ def run_v16_pipeline(train_df, test_df, seed=42, verbose=True):
     fm_info = {"used": False, "prob_columns": []}
     if CONFIG["USE_FM_PROBABILITIES"]:
         train_df, test_df, fm_info = crossfit_fm_probabilities(train_df, test_df, seed=seed)
+        # v16+ no-leakage interactions targeting the G5_C2C + predicted-F bottleneck.
+        train_df, test_df = add_predicted_fm_interactions(train_df, test_df, fm_info)
 
     # Train correction experts over multiple physical baselines.
     base_cols = ["base_min", "base_global", "base_local", "base_mean", "base_geom", "base_pne", "base_pcrl"]
@@ -1274,6 +1475,44 @@ def run_v16_pipeline(train_df, test_df, seed=42, verbose=True):
                 print(f"  added regime specialist {rg}: train={ntr}, test={nte}, local_OOF_R2={info_r.get('oof_r2', np.nan):.5f}")
             except Exception as e:
                 print(f"  [SPECIALIST WARN] regime {rg} failed: {repr(e)}")
+
+    # v16+ targeted specialist: High predicted-F probability inside G5_C2C.
+    # No leakage: uses cross-fitted predicted FM probabilities only.
+    if "FMint_G5C2C_x_PF" in train_df.columns:
+        try:
+            min_rows_pf = max(40, CONFIG.get("MIN_SPECIALIST_ROWS", 55) - 15)
+            pf_score_tr = train_df["FMint_G5C2C_x_PF"].astype(float).values
+            pf_score_te = test_df["FMint_G5C2C_x_PF"].astype(float).values
+            # Adaptive threshold: median of nonzero G5_C2C×P(F) scores in train.
+            nz_tr = pf_score_tr[pf_score_tr > 0]
+            thr = float(np.median(nz_tr)) if len(nz_tr) >= 20 else 0.0
+            tr_mask = pf_score_tr >= thr if thr > 0 else (pf_score_tr > 0)
+            te_mask = pf_score_te >= thr if thr > 0 else (pf_score_te > 0)
+            ntr, nte = int(tr_mask.sum()), int(te_mask.sum())
+            print(f"\n[SPECIALIST] HighPF_C2C: thr={thr:.4f}, train_rows={ntr}, test_rows={nte}")
+            if ntr >= min_rows_pf and nte > 0:
+                fallback_oof = expert_oof[0].copy()
+                fallback_test = expert_test[0].copy()
+                sub_tr = train_df.loc[tr_mask].copy().reset_index(drop=True)
+                sub_te = test_df.loc[te_mask].copy().reset_index(drop=True)
+                poof_pf, ptest_pf, info_pf = train_correction_expert(
+                    "HIGH_PF_C2C_SPECIALIST", sub_tr, sub_te, "base_local", seed=seed + 911,
+                )
+                stitched_oof = fallback_oof.copy()
+                stitched_test = fallback_test.copy()
+                stitched_oof[tr_mask] = poof_pf
+                stitched_test[te_mask] = ptest_pf
+                expert_oof.append(stitched_oof)
+                expert_test.append(stitched_test)
+                info_pf["specialist_type"] = "HIGH_PF_C2C"
+                info_pf["threshold"] = thr
+                info_pf["n_train"] = ntr
+                info_pf["n_test"] = nte
+                expert_info.append(info_pf)
+            else:
+                print("  [SPECIALIST] HighPF_C2C skipped: too few rows.")
+        except Exception as e:
+            print(f"  [SPECIALIST WARN] HIGH_PF_C2C failed: {repr(e)}")
 
     # Add raw baselines as weak experts
     for base in base_cols:
@@ -1581,7 +1820,7 @@ def main():
         cv_df, cv_summary = repeated_cv_fast(df, seed=CONFIG["RANDOM_STATE"])
         cv_df.to_csv(out_dir / "v16_repeated_cv_folds.csv", index=False)
         with open(out_dir / "v16_repeated_cv_summary.json", "w", encoding="utf-8") as f:
-            json.dump(cv_summary, f, indent=2, ensure_ascii=False)
+            json.dump(to_json_safe(cv_summary), f, indent=2, ensure_ascii=False)
         print_metrics("REPEATED CV SUMMARY", cv_summary)
 
     # Plots and SHAP
@@ -1604,6 +1843,17 @@ def main():
     with open(out_dir / "v16_feature_report.json", "w", encoding="utf-8") as f:
         json.dump(feature_report, f, indent=2, ensure_ascii=False)
 
+    # Build expert_info copies that contain only JSON-friendly fields
+    # (drop the trained blender objects that previously broke json.dump).
+    expert_info_public = []
+    for info in (bundle.get("expert_info") or []):
+        ei = {}
+        for k, v in info.items():
+            if k in ("blend",):
+                continue
+            ei[k] = v
+        expert_info_public.append(ei)
+
     summary = {
         "data_path": data_path,
         "n_rows": int(len(df)),
@@ -1614,15 +1864,30 @@ def main():
         "config": CONFIG,
         "bundle_public_info": {
             "fm_info": bundle.get("fm_info"),
-            "expert_info": bundle.get("expert_info"),
+            "expert_info": expert_info_public,
             "meta_name": bundle.get("meta_name"),
             "calibration_used": bundle.get("calibration_used"),
             "residual_used": bundle.get("residual_used"),
             "pareto_selected": bundle.get("meta_name"),
         },
     }
-    with open(out_dir / "v16_final_summary.json", "w", encoding="utf-8") as f:
-        json.dump(summary, f, indent=2, ensure_ascii=False)
+    try:
+        with open(out_dir / "v16_final_summary.json", "w", encoding="utf-8") as f:
+            json.dump(to_json_safe(summary), f, indent=2, ensure_ascii=False)
+    except Exception as e:
+        print(f"[WARN] final summary JSON serialization fallback engaged: {repr(e)}")
+        with open(out_dir / "v16_final_summary.json", "w", encoding="utf-8") as f:
+            json.dump({
+                "data_path": data_path,
+                "n_rows": int(len(df)),
+                "stage": str(bundle.get("stage")),
+                "holdout_train_metrics": to_json_safe(train_metrics),
+                "holdout_test_metrics": to_json_safe(test_metrics),
+                "repeated_cv_summary": to_json_safe(cv_summary),
+                "meta_name": str(bundle.get("meta_name")),
+                "calibration_used": bool(bundle.get("calibration_used")),
+                "residual_used": bool(bundle.get("residual_used")),
+            }, f, indent=2, ensure_ascii=False)
 
     if CONFIG["SAVE_MODELS"] and HAS_JOBLIB:
         try:
