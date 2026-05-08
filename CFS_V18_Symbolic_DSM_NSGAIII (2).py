@@ -414,6 +414,7 @@ def compute_metrics(y_true: Any, y_pred: Any) -> dict[str, float]:
     if len(yt) < 2:
         return {}
     ratio = yt / np.maximum(yp, EPS)
+    yp_over_yt = yp / np.maximum(yt, EPS)
     return {
         "N": int(len(yt)),
         "R2": float(r2_score(yt, yp)),
@@ -425,22 +426,131 @@ def compute_metrics(y_true: Any, y_pred: Any) -> dict[str, float]:
         "Unsafe_Overprediction_%": float(np.mean(yp > yt) * 100.0),
         "Unsafe_5_%": float(np.mean(yp > 1.05 * yt) * 100.0),
         "Unsafe_10_%": float(np.mean(yp > 1.10 * yt) * 100.0),
+        # v18+ severe-tail safety metrics. Catch the rare catastrophic
+        # overpredictions a good mean MAPE would otherwise hide.
+        "Unsafe_20_%": float(np.mean(yp > 1.20 * yt) * 100.0),
+        "Max_Overprediction": float(np.max(yp_over_yt)),
+        "P95_Overprediction": float(np.quantile(yp_over_yt, 0.95)),
         "PtPy_gt_1p30_%": float(np.mean(yp > 1.30) * 100.0),
     }
 
 
 def group_fairness_metrics(df: pd.DataFrame, pred: np.ndarray, group_col: str = "SG_design") -> dict[str, float]:
+    """Per-design-group safety metrics.
+
+    Beyond the original Max/Std MAPE we also expose the worst-group unsafe
+    rate, worst-group bias deviation, and worst-group max overprediction so
+    a candidate cannot pass by averaging out a localized failure.
+    """
+    empty = {
+        "Max_Group_MAPE_%": np.nan,
+        "Std_Group_MAPE_%": np.nan,
+        "Max_Group_Unsafe_10_%": np.nan,
+        "Worst_Group_Mean_TP_dev": np.nan,
+        "Worst_Group_Max_Overprediction": np.nan,
+    }
     if group_col not in df.columns:
-        return {"Max_Group_MAPE_%": np.nan, "Std_Group_MAPE_%": np.nan}
+        return empty
     tmp = pd.DataFrame({"actual": df["PtPy_actual"].values, "pred": pred, "group": df[group_col].values})
-    values = []
+    mapes: list[float] = []
+    unsafes_10: list[float] = []
+    bias_devs: list[float] = []
+    max_overs: list[float] = []
     for _, part in tmp.groupby("group"):
         met = compute_metrics(part["actual"], part["pred"])
-        if met and met["N"] >= 3:
-            values.append(met["MAPE_%"])
-    if not values:
-        return {"Max_Group_MAPE_%": np.nan, "Std_Group_MAPE_%": np.nan}
-    return {"Max_Group_MAPE_%": float(np.max(values)), "Std_Group_MAPE_%": float(np.std(values))}
+        if not met or met.get("N", 0) < 3:
+            continue
+        mapes.append(met["MAPE_%"])
+        unsafes_10.append(float(met.get("Unsafe_10_%", 0.0)))
+        bias_devs.append(abs(float(met.get("Mean_Test_over_Pred", 1.0)) - 1.0))
+        max_overs.append(float(met.get("Max_Overprediction", 1.0)))
+    if not mapes:
+        return empty
+    return {
+        "Max_Group_MAPE_%": float(np.max(mapes)),
+        "Std_Group_MAPE_%": float(np.std(mapes)),
+        "Max_Group_Unsafe_10_%": float(np.max(unsafes_10)),
+        "Worst_Group_Mean_TP_dev": float(np.max(bias_devs)),
+        "Worst_Group_Max_Overprediction": float(np.max(max_overs)),
+    }
+
+
+def singularity_safety_audit(
+    g_callable,
+    holdout_df: pd.DataFrame,
+    features: list[str],
+    n_grid_samples: int = 2000,
+    g_abs_max: float = 5.0,
+    extreme_g_threshold: float = 2.5,
+    extreme_g_max_frac: float = 0.02,
+    nonfinite_max_frac: float = 0.005,
+) -> dict[str, Any]:
+    """Hard safety audit against denominator/singular blow-ups.
+
+    Pt/Py = DSM_local * exp(g). If g spikes to ±5 the corrected prediction
+    multiplies/divides by ~150 — clearly non-physical. We sample N synthetic
+    feature combinations uniformly within the empirical 2nd–98th percentile
+    range of the holdout features and evaluate the symbolic correction g
+    on them. If |g| ever exceeds g_abs_max, or a meaningful fraction
+    exceeds the softer ``extreme_g_threshold``, or any value is non-finite
+    above tolerance, we flag the equation as singular/dangerous.
+    """
+    info = {
+        "Singularity_Safe": False,
+        "Singularity_MaxAbsG": float("inf"),
+        "Singularity_FracExtreme": 1.0,
+        "Singularity_FracNonFinite": 1.0,
+        "Singularity_Reason": "no_eval",
+    }
+    feats = [c for c in features if c in holdout_df.columns]
+    if not feats:
+        info["Singularity_Reason"] = "no_features"
+        return info
+    rng = np.random.default_rng(2026)
+    grid = pd.DataFrame(index=range(n_grid_samples))
+    for col in feats:
+        vals = pd.to_numeric(holdout_df[col], errors="coerce").dropna().values.astype(float)
+        if len(vals) < 3:
+            grid[col] = 0.0
+            continue
+        lo, hi = np.percentile(vals, [2.0, 98.0])
+        if not np.isfinite(lo) or not np.isfinite(hi) or hi <= lo:
+            lo, hi = float(np.min(vals)), float(np.max(vals))
+        grid[col] = rng.uniform(lo, hi, n_grid_samples)
+    # The g function expects a frame with feature columns only.
+    try:
+        g_vals = np.asarray(g_callable(grid), dtype=float)
+    except Exception as exc:
+        info["Singularity_Reason"] = f"eval_error::{type(exc).__name__}"
+        return info
+
+    finite_mask = np.isfinite(g_vals)
+    frac_non_finite = float(1.0 - finite_mask.mean())
+    info["Singularity_FracNonFinite"] = frac_non_finite
+    g_finite = g_vals[finite_mask]
+    if g_finite.size == 0:
+        info["Singularity_Reason"] = "all_non_finite"
+        return info
+    max_abs_g = float(np.max(np.abs(g_finite)))
+    frac_extreme = float(np.mean(np.abs(g_finite) > extreme_g_threshold))
+    info["Singularity_MaxAbsG"] = max_abs_g
+    info["Singularity_FracExtreme"] = frac_extreme
+
+    is_safe = (
+        frac_non_finite <= nonfinite_max_frac
+        and max_abs_g < g_abs_max
+        and frac_extreme < extreme_g_max_frac
+    )
+    info["Singularity_Safe"] = bool(is_safe)
+    if is_safe:
+        info["Singularity_Reason"] = "safe"
+    elif frac_non_finite > nonfinite_max_frac:
+        info["Singularity_Reason"] = f"non_finite_{frac_non_finite:.3f}"
+    elif max_abs_g >= g_abs_max:
+        info["Singularity_Reason"] = f"abs_g_blowup_{max_abs_g:.2f}"
+    else:
+        info["Singularity_Reason"] = f"frac_extreme_{frac_extreme:.3f}"
+    return info
 
 
 def monotonicity_penalty(df: pd.DataFrame, predict_fn, n_base: int = 80, n_grid: int = 8) -> float:
@@ -526,14 +636,25 @@ def conservative_calibration(y_true: Any, y_pred: Any, target_bias: tuple[float,
 
 
 def hard_constraint_pass(row: pd.Series, max_complexity: float = 45.0) -> bool:
+    """Hard rejection rules. ANY failure removes the candidate from
+    publication-grade pools regardless of how high its R² is.
+    """
     return bool(
         row.get("R2", -999.0) >= 0.90
         and row.get("MAPE_%", 999.0) <= 10.0
         and row.get("COV_Test_over_Pred", 999.0) <= 0.15
         and 0.98 <= row.get("Mean_Test_over_Pred", -999.0) <= 1.12
         and row.get("Unsafe_10_%", 999.0) <= 15.0
+        # v18+ severe-tail / safety rejections
+        and row.get("Unsafe_20_%", 999.0) <= 5.0
+        and row.get("Max_Overprediction", 999.0) <= 1.30
+        and row.get("Max_Group_Unsafe_10_%", 999.0) <= 25.0
+        and row.get("Worst_Group_Mean_TP_dev", 999.0) <= 0.20
         and row.get("Monotonicity_Violation", 999.0) <= 0.05
         and row.get("complexity", 999.0) <= max_complexity
+        # v18+ singularity / denominator safety: hard reject any equation that
+        # blows up on a synthetic grid filling the empirical feature space.
+        and bool(row.get("Singularity_Safe", False))
     )
 
 
@@ -887,6 +1008,7 @@ def evaluate_equations(
             fairness = group_fairness_metrics(holdout, pred)
             mono = monotonicity_penalty(holdout, pred_fn)
             calib = conservative_calibration(holdout["PtPy_actual"], pred)
+            singularity = singularity_safety_audit(g_fn, holdout, features)
             rows.append({
                 "candidate_id": f"EQ_{i:04d}",
                 "target_stage": target_stage,
@@ -898,6 +1020,7 @@ def evaluate_equations(
                 **fairness,
                 "Monotonicity_Violation": mono,
                 **calib,
+                **singularity,
             })
         except Exception as exc:
             rows.append({
@@ -919,24 +1042,31 @@ def evaluate_equations(
     valid = table.dropna(subset=[c for c in numeric_cols if c in table.columns]).copy()
     if not valid.empty:
         valid["Hard_Constraint_Pass"] = valid.apply(hard_constraint_pass, axis=1)
+        # v18+ Pareto front extended with severe-tail and worst-group safety
+        # objectives so a candidate cannot dominate by averaging out a single
+        # catastrophic case or one bad design group.
         objectives = np.column_stack([
             1.0 - valid["R2"].values,
             valid["MAPE_%"].values,
             valid["COV_Test_over_Pred"].values,
             np.abs(valid["Mean_Test_over_Pred"].values - 1.03),
             valid["Unsafe_5_%"].values,
+            valid.get("Unsafe_20_%", pd.Series(np.zeros(len(valid)))).values,
+            valid.get("Max_Overprediction", pd.Series(np.ones(len(valid)))).values,
             valid["complexity"].values / 100.0,
             valid["Monotonicity_Violation"].values,
             valid["Max_Group_MAPE_%"].values,
+            valid.get("Max_Group_Unsafe_10_%", pd.Series(np.zeros(len(valid)))).values,
         ])
         objectives = np.nan_to_num(objectives, nan=1e6, posinf=1e6, neginf=1e6)
         valid["Pareto_NonDominated"] = pareto_front_mask(objectives)
         valid = add_ranking_score(valid)
-        table = table.merge(
-            valid[["candidate_id", "Hard_Constraint_Pass", "Pareto_NonDominated", "Score"]],
-            on="candidate_id",
-            how="left",
-        )
+        merge_cols = [c for c in [
+            "candidate_id", "Hard_Constraint_Pass", "Pareto_NonDominated", "Score",
+            "Singularity_Safe", "Singularity_MaxAbsG", "Singularity_FracExtreme",
+            "Singularity_Reason",
+        ] if c in valid.columns]
+        table = table.merge(valid[merge_cols], on="candidate_id", how="left")
     table.to_csv(out_dir / "nsga3_candidate_evaluation.csv", index=False)
     return table
 
@@ -1244,9 +1374,17 @@ def main() -> int:
             "COV_max": 0.15,
             "Mean_Test_over_Pred_range": [0.98, 1.12],
             "Unsafe_10_max_%": 15.0,
+            "Unsafe_20_max_%": 5.0,
+            "Max_Overprediction_max": 1.30,
+            "Max_Group_Unsafe_10_max_%": 25.0,
+            "Worst_Group_Mean_TP_dev_max": 0.20,
             "Monotonic_violation_max": 0.05,
             "Official_complexity_max": 45,
             "Conservative_k_range": [0.90, 1.00],
+            "Singularity_audit_required": True,
+            "Singularity_abs_g_max": 5.0,
+            "Singularity_extreme_g_threshold": 2.5,
+            "Singularity_extreme_g_max_frac": 0.02,
         },
         "nsga3_objectives_minimized": [
             "1 - R2_test",
@@ -1254,9 +1392,12 @@ def main() -> int:
             "COV_test_over_pred",
             "abs(mean_test_over_pred - 1.03)",
             "unsafe_5_percent",
+            "unsafe_20_percent",
+            "max_overprediction",
             "complexity / 100",
             "monotonicity_violation",
             "max_group_MAPE",
+            "max_group_unsafe_10_percent",
         ],
     }
     json_dump(report, out_dir / "symbolic_report.json")
