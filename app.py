@@ -490,6 +490,46 @@ with st.sidebar:
 
 if load_btn or "package_loaded" not in st.session_state:
     try:
+        repo_zip_candidates = [
+            Path("results v17") / "cfs_v17_FINAL_PACKAGE.zip",
+            Path("results%20v17") / "cfs_v17_FINAL_PACKAGE.zip",
+            Path("cfs_v17_FINAL_PACKAGE.zip"),
+        ]
+
+        local_repo_zip = None
+        for candidate in repo_zip_candidates:
+            if candidate.exists():
+                local_repo_zip = candidate
+                break
+
+        if source_mode == "Upload ZIP manually" and uploaded_zip is not None:
+            ZIP_LOCAL_PATH.write_bytes(uploaded_zip.getvalue())
+            package_source_msg = "uploaded ZIP"
+
+        elif local_repo_zip is not None:
+            shutil.copyfile(local_repo_zip, ZIP_LOCAL_PATH)
+            package_source_msg = f"local repository ZIP: {local_repo_zip}"
+
+        else:
+            with st.spinner("Downloading V17 package from GitHub..."):
+                download_file(github_url, ZIP_LOCAL_PATH)
+            package_source_msg = "GitHub raw URL"
+
+        with st.spinner(f"Extracting and loading model package from {package_source_msg}..."):
+            predictor, pkg_dir = load_package_from_path(str(ZIP_LOCAL_PATH))
+            files = read_package_files(pkg_dir)
+
+        st.session_state["predictor"] = predictor
+        st.session_state["pkg_dir"] = pkg_dir
+        st.session_state["files"] = files
+        st.session_state["package_loaded"] = True
+
+        st.success(f"V17 package loaded successfully from {package_source_msg}.")
+
+    except Exception as e:
+        st.error("Could not load the package.")
+        st.exception(e)
+        st.stop()    try:
         if source_mode == "Upload ZIP manually" and uploaded_zip is not None:
             ZIP_LOCAL_PATH.write_bytes(uploaded_zip.getvalue())
         else:
