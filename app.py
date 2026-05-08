@@ -486,8 +486,6 @@ with st.sidebar:
         """
     )
     st.warning("FM is not required for prediction. It is audit-only in the research pipeline.")
-
-
 if load_btn or "package_loaded" not in st.session_state:
     try:
         repo_zip_candidates = [
@@ -529,30 +527,7 @@ if load_btn or "package_loaded" not in st.session_state:
     except Exception as e:
         st.error("Could not load the package.")
         st.exception(e)
-        st.stop()    try:
-        if source_mode == "Upload ZIP manually" and uploaded_zip is not None:
-            ZIP_LOCAL_PATH.write_bytes(uploaded_zip.getvalue())
-        else:
-            with st.spinner("Downloading V17 package from GitHub..."):
-                download_file(github_url, ZIP_LOCAL_PATH)
-
-        with st.spinner("Extracting and loading model package..."):
-            predictor, pkg_dir = load_package_from_path(str(ZIP_LOCAL_PATH))
-            files = read_package_files(pkg_dir)
-
-        st.session_state["predictor"] = predictor
-        st.session_state["pkg_dir"] = pkg_dir
-        st.session_state["files"] = files
-        st.session_state["package_loaded"] = True
-
-        st.success("V17 package loaded successfully.")
-
-    except Exception as e:
-        st.error("Could not load the package.")
-        st.exception(e)
         st.stop()
-
-
 predictor = st.session_state["predictor"]
 pkg_dir = st.session_state["pkg_dir"]
 files = st.session_state["files"]
