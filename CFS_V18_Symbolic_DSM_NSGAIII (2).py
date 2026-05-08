@@ -95,6 +95,41 @@ from typing import Any, Iterable
 _KAGGLE = bool(os.environ.get("KAGGLE_KERNEL_RUN_TYPE")) or Path("/kaggle/working").exists()
 
 
+def _sanitize_argv_for_jupyter() -> None:
+    """Strip IPython/Jupyter kernel-launcher flags injected into sys.argv.
+
+    Kaggle/Colab/Jupyter run the script through ipykernel which injects flags
+    like ``-f /tmp/.../kernel.json`` and ``--HistoryManager.hist_file=:memory:``
+    that argparse would reject. We detect that pattern and reset sys.argv to
+    just the program name so the rest of the pipeline (and argparse) sees a
+    clean, empty CLI.
+    """
+    argv = sys.argv[1:]
+    if not argv:
+        return
+    looks_like_kernel = False
+    if any("kernel_launcher" in a or "ipykernel" in a for a in argv):
+        looks_like_kernel = True
+    for i, a in enumerate(argv):
+        if a == "-f" and i + 1 < len(argv) and argv[i + 1].endswith(".json"):
+            looks_like_kernel = True
+            break
+    if any(a.startswith("--HistoryManager") for a in argv):
+        looks_like_kernel = True
+    try:
+        from IPython import get_ipython
+        if get_ipython() is not None:
+            looks_like_kernel = True
+    except Exception:
+        pass
+    if looks_like_kernel:
+        print(f"[BOOTSTRAP] Detected IPython/Jupyter kernel; stripping kernel argv: {argv}")
+        sys.argv = [sys.argv[0]]
+
+
+_sanitize_argv_for_jupyter()
+
+
 def _ensure_packages(packages: list[str]) -> None:
     missing = []
     name_map = {"scikit-learn": "sklearn", "pysr": "pysr", "pymoo": "pymoo",
