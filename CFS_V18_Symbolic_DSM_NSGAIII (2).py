@@ -1027,16 +1027,38 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--features", choices=["official", "extended"], default="official", help="Feature set for PySR/equation evaluation.")
     parser.add_argument("--no-package", action="store_true", help="Skip auto-zipping the output directory at the end.")
 
-    # Kaggle / cloud notebook ergonomics: when run without CLI args inside a
-    # Kaggle kernel, switch to a sensible publication-friendly default
-    # (run PySR on the official feature set with the quick preset and write
-    # the final ZIP into /kaggle/working).
-    argv = sys.argv[1:]
-    if not argv and _KAGGLE:
-        out_default = Path("/kaggle/working/results_v18_symbolic")
+    # Kaggle / cloud notebook ergonomics: when run inside an IPython kernel
+    # (Kaggle, Colab, Jupyter), sys.argv contains kernel-launcher flags such
+    # as ``-f /tmp/.../kernel.json`` that argparse would reject. Detect that
+    # case and replace argv with our publication-friendly defaults so the
+    # user can simply hit "Run" without any CLI arguments.
+    raw_argv = sys.argv[1:]
+
+    def _looks_like_ipykernel(argv: list[str]) -> bool:
+        if not argv:
+            return False
+        if any("kernel_launcher" in a or "ipykernel" in a for a in argv):
+            return True
+        # Pattern: -f /tmp/<...>.json injected by Jupyter/IPython kernels.
+        for i, a in enumerate(argv):
+            if a == "-f" and i + 1 < len(argv) and argv[i + 1].endswith(".json"):
+                return True
+        try:
+            from IPython import get_ipython
+            if get_ipython() is not None:
+                return True
+        except Exception:
+            pass
+        return False
+
+    use_defaults = (not raw_argv) or _looks_like_ipykernel(raw_argv) or _KAGGLE
+    if use_defaults:
+        out_default = Path("/kaggle/working/results_v18_symbolic") if Path("/kaggle/working").exists() else DEFAULT_OUT_DIR
         argv = ["--run-pysr", "--preset", "quick", "--features", "official",
                 "--out-dir", str(out_default)]
-        print(f"[BOOTSTRAP] No CLI args + Kaggle detected -> auto-running with: {argv}")
+        print(f"[BOOTSTRAP] Kaggle/IPython context detected -> auto-running with: {argv}")
+    else:
+        argv = raw_argv
     return parser.parse_args(argv)
 
 
