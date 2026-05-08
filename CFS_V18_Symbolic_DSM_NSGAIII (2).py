@@ -74,16 +74,110 @@ import argparse
 import importlib
 import importlib.util
 import json
+import os
 import shutil
+import subprocess
 import sys
 import textwrap
+import urllib.request
 import zipfile
 from pathlib import Path
 from typing import Any, Iterable
 
+# ---------------------------------------------------------------------------
+# v18 self-contained bootstrap: install missing deps and fetch the V17 ZIP
+# automatically when running on Kaggle / a fresh cloud notebook. Skip silently
+# if everything is already importable. Heavy/optional packages (pysr, pymoo,
+# sympy) install but the rest of the script will gracefully degrade if pysr's
+# Julia runtime is unavailable.
+# ---------------------------------------------------------------------------
+
+_KAGGLE = bool(os.environ.get("KAGGLE_KERNEL_RUN_TYPE")) or Path("/kaggle/working").exists()
+
+
+def _ensure_packages(packages: list[str]) -> None:
+    missing = []
+    name_map = {"scikit-learn": "sklearn", "pysr": "pysr", "pymoo": "pymoo",
+                "sympy": "sympy", "openpyxl": "openpyxl", "xgboost": "xgboost",
+                "lightgbm": "lightgbm", "matplotlib": "matplotlib",
+                "joblib": "joblib", "pandas": "pandas", "numpy": "numpy"}
+    for pkg in packages:
+        spec_name = name_map.get(pkg.split("==")[0], pkg.split("==")[0])
+        if importlib.util.find_spec(spec_name) is None:
+            missing.append(pkg)
+    if not missing:
+        return
+    print(f"[BOOTSTRAP] Installing missing packages: {missing}")
+    for pkg in missing:
+        try:
+            subprocess.check_call([sys.executable, "-m", "pip", "install", "-q", pkg])
+        except Exception as exc:
+            print(f"[BOOTSTRAP WARN] Could not install {pkg}: {exc!r}")
+
+
+# Always make sure the lightweight packages used by pure dataset/baseline mode
+# are present. The optional research stack is installed too on Kaggle so that
+# --run-pysr works out of the box without any additional uploads.
+_ensure_packages(["pandas", "numpy", "scikit-learn==1.6.1", "joblib", "matplotlib",
+                  "xgboost", "lightgbm", "openpyxl", "sympy", "pymoo"])
+if _KAGGLE:
+    # PySR requires a Julia runtime; Kaggle provides one transparently after
+    # install. We attempt the install but never fail the whole pipeline if the
+    # pysr install or its first-time Julia setup is unavailable.
+    _ensure_packages(["pysr"])
+
 import numpy as np
 import pandas as pd
 from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
+
+
+# ---------------------------------------------------------------------------
+# v18 Kaggle/cloud auto-fetch helpers
+# ---------------------------------------------------------------------------
+
+
+def _candidate_zip_paths() -> list[Path]:
+    candidates: list[Path] = []
+    here = Path(__file__).resolve().parent if "__file__" in globals() else Path.cwd()
+    candidates.append(here / "results v17" / "cfs_v17_FINAL_PACKAGE.zip")
+    candidates.append(here / "cfs_v17_FINAL_PACKAGE.zip")
+    candidates.append(Path.cwd() / "results v17" / "cfs_v17_FINAL_PACKAGE.zip")
+    candidates.append(Path.cwd() / "cfs_v17_FINAL_PACKAGE.zip")
+    candidates.append(Path("/kaggle/working/cfs_v17_FINAL_PACKAGE.zip"))
+    candidates.append(Path("/kaggle/working/results v17/cfs_v17_FINAL_PACKAGE.zip"))
+    candidates.append(Path("/kaggle/input/cfs-v17-final-package/cfs_v17_FINAL_PACKAGE.zip"))
+    candidates += list(Path("/kaggle/input").glob("**/cfs_v17_FINAL_PACKAGE.zip")) if Path("/kaggle/input").exists() else []
+    candidates.append(Path("results v17") / "cfs_v17_FINAL_PACKAGE.zip")
+    return candidates
+
+
+# URL-encoded path to the V17 package on the active feature branch.
+V17_ZIP_URL = (
+    "https://raw.githubusercontent.com/Dr-Yehia/Stability-book/"
+    "claude/analyze-v16-results-AjbG2/results%20v17/cfs_v17_FINAL_PACKAGE.zip"
+)
+
+
+def auto_locate_v17_zip(preferred: Path | None = None) -> Path:
+    """Return a usable path to cfs_v17_FINAL_PACKAGE.zip, downloading if needed."""
+    if preferred is not None and Path(preferred).exists() and Path(preferred).stat().st_size > 1024:
+        return Path(preferred)
+    for cand in _candidate_zip_paths():
+        if cand.exists() and cand.stat().st_size > 1024:
+            print(f"[BOOTSTRAP] Found local V17 package: {cand}")
+            return cand
+    # Download to /kaggle/working when on Kaggle, otherwise current dir.
+    target_dir = Path("/kaggle/working") if _KAGGLE and Path("/kaggle/working").exists() else Path.cwd()
+    target = target_dir / "cfs_v17_FINAL_PACKAGE.zip"
+    print(f"[BOOTSTRAP] Downloading V17 package from GitHub:\n  {V17_ZIP_URL}")
+    req = urllib.request.Request(V17_ZIP_URL, headers={"User-Agent": "Mozilla/5.0"})
+    with urllib.request.urlopen(req, timeout=300) as resp:
+        data = resp.read()
+    if len(data) < 1024:
+        raise RuntimeError("Downloaded V17 package is suspiciously small; aborting.")
+    target.write_bytes(data)
+    print(f"[BOOTSTRAP] V17 package saved: {target} ({len(data)/1024:.1f} KB)")
+    return target
 
 
 # ---------------------------------------------------------------------------
@@ -319,7 +413,10 @@ def monotonicity_penalty(df: pd.DataFrame, predict_fn, n_base: int = 80, n_grid:
 
     A violation occurs when increasing the chosen slenderness variable increases
     predicted Pt/Py beyond a small numerical tolerance while other variables are
-    fixed at sampled row values.
+    fixed at sampled row values. When lambda_led slides we also recompute the
+    physics baselines (DSM_local, DSM_global, base_min/mean/geom) from the new
+    slenderness so the test reflects the full Pt/Py = DSM_local * exp(g)
+    expression rather than only the symbolic correction g.
     """
     if df.empty:
         return float("nan")
@@ -336,6 +433,20 @@ def monotonicity_penalty(df: pd.DataFrame, predict_fn, n_base: int = 80, n_grid:
         for _, row in sample.iterrows():
             block = pd.DataFrame([row.to_dict()] * n_grid)
             block[variable] = grid
+            # Recompute physics-baseline columns that depend on the swept variable.
+            if variable == "lambda_c":
+                block["DSM_global"] = dsm_global(block["lambda_c"].astype(float).values)
+            elif variable == "lambda_led":
+                pne_py = block["Pne_Py"].astype(float).values if "Pne_Py" in block.columns else np.full(n_grid, np.nan)
+                block["DSM_local"] = dsm_local(block["lambda_led"].astype(float).values, pne_py)
+            # Refresh derived multi-baseline columns when present so the mono test
+            # reflects DSM_local * exp(g) faithfully across the grid.
+            cols_for_base = [c for c in ["DSM_global", "DSM_local", "Pne_Py", "Pcrl_Py"] if c in block.columns]
+            if {"DSM_global", "DSM_local", "Pne_Py", "Pcrl_Py"}.issubset(block.columns):
+                stack = block[["DSM_global", "DSM_local", "Pne_Py", "Pcrl_Py"]].astype(float).values
+                block["base_min"] = np.nanmin(stack, axis=1)
+                block["base_mean"] = np.nanmean(stack, axis=1)
+                block["base_geom"] = np.exp(np.nanmean(np.log(np.maximum(stack, EPS)), axis=1))
             pred = np.asarray(predict_fn(block), dtype=float)
             diffs = np.diff(pred)
             total += len(diffs)
@@ -424,14 +535,18 @@ def pareto_front_mask(objectives: np.ndarray) -> np.ndarray:
     """Return non-dominated mask for minimization objectives.
 
     Uses pymoo when available and falls back to a deterministic NumPy routine.
+    All pymoo lookups are wrapped so a missing or broken pymoo install never
+    crashes the pipeline.
     """
-    pymoo_sorting = importlib.util.find_spec("pymoo.util.nds.non_dominated_sorting")
-    if pymoo_sorting is not None:
-        module = importlib.import_module("pymoo.util.nds.non_dominated_sorting")
-        fronts = module.NonDominatedSorting().do(objectives, only_non_dominated_front=True)
-        mask = np.zeros(len(objectives), dtype=bool)
-        mask[np.asarray(fronts, dtype=int)] = True
-        return mask
+    try:
+        if importlib.util.find_spec("pymoo.util.nds.non_dominated_sorting") is not None:
+            module = importlib.import_module("pymoo.util.nds.non_dominated_sorting")
+            fronts = module.NonDominatedSorting().do(objectives, only_non_dominated_front=True)
+            mask = np.zeros(len(objectives), dtype=bool)
+            mask[np.asarray(fronts, dtype=int)] = True
+            return mask
+    except (ModuleNotFoundError, ImportError, AttributeError, ValueError) as exc:
+        print(f"[PARETO] pymoo unavailable, falling back to NumPy: {exc!r}")
 
     n = objectives.shape[0]
     mask = np.ones(n, dtype=bool)
@@ -701,9 +816,18 @@ def evaluate_equations(
     equations: pd.DataFrame,
     out_dir: Path,
     features: list[str],
+    allow_no_holdout: bool = False,
 ) -> pd.DataFrame:
     holdout = symbolic[symbolic["is_holdout"]].copy()
     if holdout.empty:
+        if not allow_no_holdout:
+            raise RuntimeError(
+                "evaluate_equations: no holdout rows were marked. The official "
+                "holdout split is required for honest evaluation. Re-run after "
+                "ensuring v16_holdout_predictions.csv contains 'row_index_original',"
+                " or pass --allow-no-holdout for debugging only."
+            )
+        print("[WARN] evaluate_equations: no holdout rows, using full dataset (debug mode).")
         holdout = symbolic.copy()
 
     rows = []
@@ -850,9 +974,15 @@ def select_recommendations(evaluated: pd.DataFrame) -> dict[str, Any]:
 # ---------------------------------------------------------------------------
 
 
-def evaluate_baselines(symbolic: pd.DataFrame) -> pd.DataFrame:
+def evaluate_baselines(symbolic: pd.DataFrame, allow_no_holdout: bool = False) -> pd.DataFrame:
     holdout = symbolic[symbolic["is_holdout"]].copy()
     if holdout.empty:
+        if not allow_no_holdout:
+            raise RuntimeError(
+                "evaluate_baselines: no holdout rows were marked. Pass "
+                "--allow-no-holdout for debug runs only."
+            )
+        print("[WARN] evaluate_baselines: no holdout rows, using full dataset (debug mode).")
         holdout = symbolic.copy()
     methods = {
         "AISC_SSRC": curve_aisc_ssrc(holdout["lambda_c"]),
@@ -893,15 +1023,69 @@ def parse_args() -> argparse.Namespace:
         action="store_true",
         help="Debugging only: allow PySR to train on holdout rows. Do not use for publication runs.",
     )
+    parser.add_argument("--allow-no-holdout", action="store_true", help="Debugging only: allow evaluation without a marked holdout split.")
     parser.add_argument("--features", choices=["official", "extended"], default="official", help="Feature set for PySR/equation evaluation.")
-    return parser.parse_args()
+    parser.add_argument("--no-package", action="store_true", help="Skip auto-zipping the output directory at the end.")
+
+    # Kaggle / cloud notebook ergonomics: when run without CLI args inside a
+    # Kaggle kernel, switch to a sensible publication-friendly default
+    # (run PySR on the official feature set with the quick preset and write
+    # the final ZIP into /kaggle/working).
+    argv = sys.argv[1:]
+    if not argv and _KAGGLE:
+        out_default = Path("/kaggle/working/results_v18_symbolic")
+        argv = ["--run-pysr", "--preset", "quick", "--features", "official",
+                "--out-dir", str(out_default)]
+        print(f"[BOOTSTRAP] No CLI args + Kaggle detected -> auto-running with: {argv}")
+    return parser.parse_args(argv)
+
+
+# ---------------------------------------------------------------------------
+# v18 final packaging: produce a single downloadable ZIP next to the output
+# directory so the user gets one click in the Kaggle Output panel.
+# ---------------------------------------------------------------------------
+
+
+def package_outputs_zip(out_dir: Path, archive_basename: str = "cfs_v18_FINAL_PACKAGE") -> Path | None:
+    out_dir = Path(out_dir)
+    if not out_dir.exists():
+        print(f"[PACKAGE WARN] output dir missing: {out_dir}")
+        return None
+    parent = out_dir.parent if out_dir.parent.exists() else out_dir
+    archive_root = str(parent / archive_basename)
+    try:
+        archive_path = shutil.make_archive(archive_root, "zip", root_dir=str(out_dir))
+        print(f"\n[PACKAGE] Created: {archive_path}")
+        return Path(archive_path)
+    except Exception as exc:
+        print(f"[PACKAGE WARN] make_archive failed: {exc!r}")
+        try:
+            zip_path = archive_root + ".zip"
+            with zipfile.ZipFile(zip_path, "w", zipfile.ZIP_DEFLATED) as zf:
+                for p in out_dir.rglob("*"):
+                    if p.is_file():
+                        zf.write(p, arcname=p.relative_to(out_dir))
+            print(f"[PACKAGE] Created via zipfile fallback: {zip_path}")
+            return Path(zip_path)
+        except Exception as exc2:
+            print(f"[PACKAGE ERR] zipfile fallback failed: {exc2!r}")
+            return None
 
 
 def main() -> int:
     args = parse_args()
     out_dir = ensure_dir(args.out_dir)
-    if not args.zip.exists():
-        raise FileNotFoundError(f"V17 package ZIP not found: {args.zip}")
+
+    # v18 self-locating ZIP: try the user-provided path, then a list of common
+    # local paths, finally fall back to a GitHub raw download.
+    try:
+        zip_path = auto_locate_v17_zip(args.zip if args.zip.exists() else None)
+    except Exception as exc:
+        raise FileNotFoundError(
+            f"V17 package ZIP could not be located or downloaded ({exc!r}). "
+            "Provide --zip <path> or place cfs_v17_FINAL_PACKAGE.zip next to the script."
+        ) from exc
+    args.zip = zip_path
 
     work_dir = ensure_dir(out_dir / "_work")
     tables = load_package_tables(args.zip, work_dir)
@@ -923,7 +1107,18 @@ def main() -> int:
     symbolic.to_csv(symbolic_path, index=False)
     print(f"[OK] Wrote {symbolic_path} ({symbolic.shape[0]} rows, {symbolic.shape[1]} columns)")
 
-    baseline = evaluate_baselines(symbolic)
+    # Holdout guard: refuse to silently fall back to the full dataset.
+    n_holdout = int(symbolic["is_holdout"].sum())
+    print(f"[INFO] Holdout rows marked: {n_holdout} / {len(symbolic)}")
+    if n_holdout == 0 and not args.allow_no_holdout:
+        raise RuntimeError(
+            "No holdout rows were marked in the symbolic dataset. The official "
+            "holdout split is required for honest evaluation. Re-run after "
+            "confirming v16_holdout_predictions.csv carries 'row_index_original',"
+            " or pass --allow-no-holdout for debug runs only."
+        )
+
+    baseline = evaluate_baselines(symbolic, allow_no_holdout=args.allow_no_holdout)
     baseline_path = out_dir / "equation_vs_codes_table.csv"
     baseline.to_csv(baseline_path, index=False)
     print(f"[OK] Wrote {baseline_path}")
@@ -957,7 +1152,7 @@ def main() -> int:
         equations.to_csv(equations_path, index=False)
         print(f"[OK] Wrote {equations_path}")
 
-        evaluated = evaluate_equations(symbolic, equations, out_dir, features)
+        evaluated = evaluate_equations(symbolic, equations, out_dir, features, allow_no_holdout=args.allow_no_holdout)
         recommendations = select_recommendations(evaluated)
         json_dump(recommendations, out_dir / "best_symbolic_equations.json")
         print(f"[OK] Wrote {out_dir / 'best_symbolic_equations.json'}")
@@ -1014,6 +1209,29 @@ def main() -> int:
         print("[DONE] Dataset and baseline reports complete. Use --run-pysr or --candidate-equations for symbolic ranking.")
     else:
         print("[DONE] Symbolic workflow complete.")
+
+    # v18 final packaging: a single downloadable ZIP next to the output dir.
+    archive_path = None
+    if not args.no_package:
+        try:
+            archive_path = package_outputs_zip(out_dir, archive_basename="cfs_v18_FINAL_PACKAGE")
+        except Exception as exc:
+            print(f"[PACKAGE WARN] failed to package outputs: {exc!r}")
+
+    print("\n" + "=" * 100)
+    print("V18 SUMMARY")
+    print("=" * 100)
+    print(f"Output directory : {out_dir}")
+    print(f"Holdout rows     : {int(symbolic['is_holdout'].sum())} / {len(symbolic)}")
+    if not evaluated.empty and "R2" in evaluated.columns:
+        try:
+            best_r2 = float(evaluated["R2"].max())
+            print(f"Best candidate R²: {best_r2:.4f}")
+        except Exception:
+            pass
+    if archive_path:
+        print(f"\n>>> DOWNLOAD: {archive_path}")
+        print(">>> In Kaggle, click this file in the Output panel to download the full V18 package.")
     return 0
 
 
