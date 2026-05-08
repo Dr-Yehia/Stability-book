@@ -798,7 +798,9 @@ def run_pysr_stage(
         complexity_of_operators={"/": 3, "sqrt": 2, "log1p": 3, "square": 2},
         constraints={"/": (-1, 9), "sqrt": 9, "log1p": 9, "square": 9},
         nested_constraints={"sqrt": {"sqrt": 0, "log1p": 1}, "log1p": {"log1p": 0}, "square": {"square": 1}},
-        temp_equation_file=True,
+        # PySR rejects passing both temp_equation_file=True and a fixed
+        # output_directory; we want the equations written into stage_dir,
+        # so leave temp_equation_file at its default (False).
         output_directory=str(stage_dir),
         random_state=2026,
         deterministic=True,
