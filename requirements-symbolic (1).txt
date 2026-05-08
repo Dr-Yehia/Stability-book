@@ -1,0 +1,15 @@
+# Standalone optional research dependencies for CFS_V18_Symbolic_DSM_NSGAIII.py.
+# This file intentionally does not use "-r requirements.txt" so it can be
+# uploaded by itself to Kaggle/Colab/research environments.
+pandas
+numpy
+scikit-learn==1.6.1
+joblib
+matplotlib
+plotly
+xgboost
+lightgbm
+openpyxl
+sympy
+pymoo
+pysr
