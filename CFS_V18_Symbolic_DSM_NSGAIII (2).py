@@ -981,21 +981,40 @@ def run_pysr_stage(
     t = threading.Thread(target=_fit_worker, daemon=True)
     t.start()
     t0 = _time.monotonic()
-    print(f"[PYSR] target={target_name}: started silent fit on {len(x_train)} rows, {len(cols)} features", flush=True)
+    # Empirically calibrated wall-clock estimates per preset on Kaggle CPU
+    # with parallelism="multithreading" and a single hybrid target. These are
+    # used only to surface a percentage to the user; the actual run length
+    # depends on the dataset and hardware.
+    _ESTIMATED_TOTAL_MIN = {"quick": 12.0, "strong": 45.0, "final": 150.0}.get(preset, 20.0)
+    print(
+        f"[PYSR] target={target_name}: started silent fit on {len(x_train)} rows, "
+        f"{len(cols)} features (preset={preset}, est ~{_ESTIMATED_TOTAL_MIN:.0f} min)",
+        flush=True,
+    )
     last_report = 0.0
     while not fit_done["flag"]:
         t.join(timeout=10.0)
         if fit_done["flag"]:
             break
         elapsed = _time.monotonic() - t0
-        # Print every ~10s. Include current best loss / equation count when
-        # PySR has started writing its hall_of_fame file.
+        elapsed_min = elapsed / 60.0
+        pct = min(99.5, (elapsed_min / _ESTIMATED_TOTAL_MIN) * 100.0)
+        remaining_min = max(0.1, _ESTIMATED_TOTAL_MIN - elapsed_min)
         if elapsed - last_report >= 9.5:
             n_eqs, best_loss = _read_running_best(stage_dir)
             if n_eqs > 0 and np.isfinite(best_loss):
-                print(f"[PYSR] target={target_name}: alive @ {elapsed/60:.1f} min | best_loss={best_loss:.4e} | n_eqs={n_eqs}", flush=True)
+                print(
+                    f"[PYSR] {elapsed_min:5.1f} min / ~{_ESTIMATED_TOTAL_MIN:.0f} min "
+                    f"(~{pct:4.1f}% done, ~{remaining_min:.0f} min left) | "
+                    f"best_loss={best_loss:.4e} | n_eqs={n_eqs}",
+                    flush=True,
+                )
             else:
-                print(f"[PYSR] target={target_name}: alive @ {elapsed/60:.1f} min | warming up...", flush=True)
+                print(
+                    f"[PYSR] {elapsed_min:5.1f} min / ~{_ESTIMATED_TOTAL_MIN:.0f} min "
+                    f"(~{pct:4.1f}% done, ~{remaining_min:.0f} min left) | warming up...",
+                    flush=True,
+                )
             last_report = elapsed
     elapsed_total = _time.monotonic() - t0
     if fit_done["error"] is not None:
