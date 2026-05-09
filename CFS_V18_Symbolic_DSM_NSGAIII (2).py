@@ -937,90 +937,37 @@ def run_pysr_stage(
         # quality and the safety-filter pipeline are unaffected.
         deterministic=False,
         parallelism="multithreading",
-        # v18+ Kaggle stability: PySR's full Pareto-table progress print
-        # combined with Julia multithreading floods Kaggle's log buffer
-        # (~30 lines per cycle) and causes the notebook UI to appear frozen
-        # at the last visible iteration even when the Julia search is
-        # still progressing. Verbosity=0 + progress=False keeps the run
-        # silent until the final equations.csv is written.
-        verbosity=0,
-        progress=False,
+        # v18+ Restore PySR's native progress so the Kaggle log shows the
+        # familiar 'Progress: X / 24000 total iterations (Y%)' line that the
+        # user is used to. Verbosity=1 + progress=True is PySR's standard
+        # output mode. The earlier 'looping at 11%' impression was a Kaggle
+        # UI buffer artifact, not an actual hang, so re-enabling the native
+        # output is fine.
+        verbosity=1,
+        progress=True,
     )
-    # Run PySR in a background thread so we can emit a heartbeat every 10s
-    # to Kaggle's log (Julia stays on its own threads via parallelism=
-    # multithreading; this Python thread just blocks waiting for the
-    # juliacall return). The heartbeat reports elapsed time and reads
-    # PySR's on-disk hall_of_fame_*.csv to surface the current best loss.
-    import glob as _glob
-    import threading
+    # Run model.fit on the main thread; PySR's own progress lines will
+    # surface the percentage and best-loss table. We still print clear
+    # START / DONE / FAILED markers from Python so the user can grep for
+    # them in the log.
     import time as _time
-    fit_done = {"flag": False, "error": None}
-
-    def _fit_worker():
-        try:
-            model.fit(x_train, y_train, variable_names=cols)
-        except Exception as e:
-            fit_done["error"] = e
-        finally:
-            fit_done["flag"] = True
-
-    def _read_running_best(stage_path: Path) -> tuple[int, float]:
-        """Best (n_eqs, min_loss) from PySR's running hall_of_fame CSV."""
-        try:
-            cands = sorted(_glob.glob(str(stage_path / "**" / "hall_of_fame*.csv"), recursive=True))
-            if not cands:
-                return 0, float("nan")
-            df = pd.read_csv(cands[-1])
-            losses = pd.to_numeric(df.get("Loss", df.get("loss", pd.Series(dtype=float))), errors="coerce").dropna()
-            if losses.empty:
-                return int(len(df)), float("nan")
-            return int(len(df)), float(losses.min())
-        except Exception:
-            return 0, float("nan")
-
-    t = threading.Thread(target=_fit_worker, daemon=True)
-    t.start()
     t0 = _time.monotonic()
-    # Empirically calibrated wall-clock estimates per preset on Kaggle CPU
-    # with parallelism="multithreading" and a single hybrid target. These are
-    # used only to surface a percentage to the user; the actual run length
-    # depends on the dataset and hardware.
-    _ESTIMATED_TOTAL_MIN = {"quick": 12.0, "strong": 45.0, "final": 150.0}.get(preset, 20.0)
     print(
-        f"[PYSR] target={target_name}: started silent fit on {len(x_train)} rows, "
-        f"{len(cols)} features (preset={preset}, est ~{_ESTIMATED_TOTAL_MIN:.0f} min)",
+        f"[PYSR] target={target_name}: START fit on {len(x_train)} rows, "
+        f"{len(cols)} features (preset={preset})",
         flush=True,
     )
-    last_report = 0.0
-    while not fit_done["flag"]:
-        t.join(timeout=10.0)
-        if fit_done["flag"]:
-            break
-        elapsed = _time.monotonic() - t0
-        elapsed_min = elapsed / 60.0
-        pct = min(99.5, (elapsed_min / _ESTIMATED_TOTAL_MIN) * 100.0)
-        remaining_min = max(0.1, _ESTIMATED_TOTAL_MIN - elapsed_min)
-        if elapsed - last_report >= 9.5:
-            n_eqs, best_loss = _read_running_best(stage_dir)
-            if n_eqs > 0 and np.isfinite(best_loss):
-                print(
-                    f"[PYSR] {elapsed_min:5.1f} min / ~{_ESTIMATED_TOTAL_MIN:.0f} min "
-                    f"(~{pct:4.1f}% done, ~{remaining_min:.0f} min left) | "
-                    f"best_loss={best_loss:.4e} | n_eqs={n_eqs}",
-                    flush=True,
-                )
-            else:
-                print(
-                    f"[PYSR] {elapsed_min:5.1f} min / ~{_ESTIMATED_TOTAL_MIN:.0f} min "
-                    f"(~{pct:4.1f}% done, ~{remaining_min:.0f} min left) | warming up...",
-                    flush=True,
-                )
-            last_report = elapsed
-    elapsed_total = _time.monotonic() - t0
-    if fit_done["error"] is not None:
+    try:
+        model.fit(x_train, y_train, variable_names=cols)
+    except Exception as e:
+        elapsed_total = _time.monotonic() - t0
         print(f"[PYSR] target={target_name}: FAILED after {elapsed_total/60:.2f} min", flush=True)
-        raise fit_done["error"]
+        raise
+    elapsed_total = _time.monotonic() - t0
     print(f"[PYSR] target={target_name}: DONE in {elapsed_total/60:.2f} min", flush=True)
+    if model.equations_ is None or len(model.equations_) == 0:
+        print(f"[PYSR] target={target_name}: no equations returned", flush=True)
+        return pd.DataFrame()
     equations = model.equations_.copy()
     equations.insert(0, "target_stage", target_name)
     equations.insert(1, "preset", preset)
