@@ -71,6 +71,7 @@ for debugging only.
 from __future__ import annotations
 
 import argparse
+import datetime as _dt
 import importlib
 import importlib.util
 import json
@@ -79,7 +80,9 @@ import shutil
 import subprocess
 import sys
 import textwrap
+import traceback
 import urllib.request
+import uuid as _uuid
 import zipfile
 from pathlib import Path
 from typing import Any, Iterable
@@ -93,6 +96,114 @@ from typing import Any, Iterable
 # ---------------------------------------------------------------------------
 
 _KAGGLE = bool(os.environ.get("KAGGLE_KERNEL_RUN_TYPE")) or Path("/kaggle/working").exists()
+
+
+# ---------------------------------------------------------------------------
+# v18+ Comprehensive logging: every script start gets a unique RUN_ID and a
+# system banner. If Kaggle restarts the kernel mid-run, the log will show a
+# fresh banner with a different RUN_ID, making the restart unambiguous in
+# the saved log file. We also detect prior run artifacts and report them.
+# ---------------------------------------------------------------------------
+RUN_ID = _uuid.uuid4().hex[:12]
+RUN_START_ISO = _dt.datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ")
+
+
+def _safe_psutil():
+    try:
+        import psutil  # type: ignore
+        return psutil
+    except Exception:
+        return None
+
+
+def _system_snapshot() -> dict:
+    snap: dict = {
+        "RUN_ID": RUN_ID,
+        "started_utc": RUN_START_ISO,
+        "python": sys.version.split()[0],
+        "platform": sys.platform,
+        "cwd": str(Path.cwd()),
+        "kaggle_detected": _KAGGLE,
+        "argv": list(sys.argv),
+        "env_kaggle_run_type": os.environ.get("KAGGLE_KERNEL_RUN_TYPE", ""),
+        "env_kaggle_working_dir": os.environ.get("KAGGLE_WORKING_DIR", ""),
+    }
+    try:
+        snap["cpu_count"] = os.cpu_count()
+    except Exception:
+        snap["cpu_count"] = None
+    ps = _safe_psutil()
+    if ps is not None:
+        try:
+            mem = ps.virtual_memory()
+            snap["ram_total_GB"] = round(mem.total / (1024**3), 2)
+            snap["ram_avail_GB"] = round(mem.available / (1024**3), 2)
+            snap["ram_used_pct"] = mem.percent
+        except Exception:
+            pass
+    return snap
+
+
+def _print_run_banner(label: str = "RUN START") -> None:
+    snap = _system_snapshot()
+    bar = "=" * 90
+    print(bar, flush=True)
+    print(f"[V18 {label}] RUN_ID={RUN_ID} | started_utc={RUN_START_ISO}", flush=True)
+    print(bar, flush=True)
+    for k, v in snap.items():
+        print(f"  {k}: {v}", flush=True)
+    print(bar, flush=True)
+
+
+def _detect_previous_run_artifacts() -> None:
+    """Surface clear evidence in the log when Kaggle has restarted the kernel
+    and we are running on top of a previous attempt's artifacts."""
+    candidates = [
+        Path("/kaggle/working/results_v18_symbolic"),
+        Path.cwd() / "results_v18_symbolic",
+    ]
+    for path in candidates:
+        if not path.exists():
+            continue
+        kids = list(path.glob("*"))
+        if not kids:
+            continue
+        marker = path / ".v18_run_log.txt"
+        prev_lines: list[str] = []
+        if marker.exists():
+            try:
+                prev_lines = marker.read_text(encoding="utf-8").strip().splitlines()
+            except Exception:
+                prev_lines = []
+        if prev_lines:
+            print(
+                f"[V18 RESTART DETECTED] Previous run artifacts found at {path}.",
+                flush=True,
+            )
+            for line in prev_lines[-5:]:
+                print(f"  prev_run> {line}", flush=True)
+        else:
+            print(
+                f"[V18 RESTART DETECTED] Existing artifact dir at {path} (no prior run log).",
+                flush=True,
+            )
+
+
+def _append_run_log(out_dir: Path, line: str) -> None:
+    """Persist a small line to .v18_run_log.txt so a Kaggle kernel restart
+    can read what the prior attempt was doing right before it died."""
+    try:
+        out_dir.mkdir(parents=True, exist_ok=True)
+        marker = out_dir / ".v18_run_log.txt"
+        ts = _dt.datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ")
+        with open(marker, "a", encoding="utf-8") as f:
+            f.write(f"{ts} RUN_ID={RUN_ID} {line}\n")
+    except Exception:
+        pass
+
+
+_print_run_banner("BOOT")
+_detect_previous_run_artifacts()
 
 
 def _sanitize_argv_for_jupyter() -> None:
@@ -154,7 +265,7 @@ def _ensure_packages(packages: list[str]) -> None:
 # are present. The optional research stack is installed too on Kaggle so that
 # --run-pysr works out of the box without any additional uploads.
 _ensure_packages(["pandas", "numpy", "scikit-learn==1.6.1", "joblib", "matplotlib",
-                  "xgboost", "lightgbm", "openpyxl", "sympy", "pymoo"])
+                  "xgboost", "lightgbm", "openpyxl", "sympy", "pymoo", "psutil"])
 if _KAGGLE:
     # PySR requires a Julia runtime; Kaggle provides one transparently after
     # install. We attempt the install but never fail the whole pipeline if the
@@ -958,25 +1069,61 @@ def run_pysr_stage(
         verbosity=1,
         progress=True,
     )
-    # Run model.fit on the main thread; PySR's own progress lines will
-    # surface the percentage and best-loss table. We still print clear
-    # START / DONE / FAILED markers from Python so the user can grep for
-    # them in the log.
+    # Run model.fit on the main thread; PySR's own progress lines surface
+    # the percentage. Add a sidecar memory/CPU monitor thread that ticks
+    # every 30s so any RAM-related kernel restart leaves a clear trail.
+    import threading as _threading
     import time as _time
     t0 = _time.monotonic()
     print(
         f"[PYSR] target={target_name}: START fit on {len(x_train)} rows, "
-        f"{len(cols)} features (preset={preset})",
+        f"{len(cols)} features (preset={preset}) RUN_ID={RUN_ID}",
         flush=True,
     )
+    _append_run_log(out_dir, f"PYSR START target={target_name} preset={preset} cols={cols}")
+
+    monitor_stop = _threading.Event()
+
+    def _resource_monitor():
+        ps = _safe_psutil()
+        if ps is None:
+            return
+        proc = ps.Process()
+        last = 0.0
+        while not monitor_stop.is_set():
+            try:
+                mem = ps.virtual_memory()
+                p_rss_gb = proc.memory_info().rss / (1024**3)
+                line = (
+                    f"[V18 MON] RUN_ID={RUN_ID} t={(_time.monotonic()-t0)/60:.1f}min "
+                    f"RAM_used={mem.percent:.0f}% avail={mem.available/(1024**3):.2f}GB "
+                    f"proc_rss={p_rss_gb:.2f}GB cpu_pct={proc.cpu_percent(interval=None):.0f}"
+                )
+                if (_time.monotonic() - last) >= 30.0:
+                    print(line, flush=True)
+                    _append_run_log(out_dir, line)
+                    last = _time.monotonic()
+            except Exception:
+                pass
+            monitor_stop.wait(5.0)
+
+    mon_thread = _threading.Thread(target=_resource_monitor, daemon=True)
+    mon_thread.start()
     try:
         model.fit(x_train, y_train, variable_names=cols)
     except Exception as e:
         elapsed_total = _time.monotonic() - t0
+        tb = traceback.format_exc()
         print(f"[PYSR] target={target_name}: FAILED after {elapsed_total/60:.2f} min", flush=True)
+        print(f"[PYSR] FAILED traceback:\n{tb}", flush=True)
+        _append_run_log(out_dir, f"PYSR FAILED target={target_name} err={type(e).__name__}: {e}")
+        monitor_stop.set()
         raise
+    finally:
+        monitor_stop.set()
     elapsed_total = _time.monotonic() - t0
     print(f"[PYSR] target={target_name}: DONE in {elapsed_total/60:.2f} min", flush=True)
+    _append_run_log(out_dir, f"PYSR DONE target={target_name} elapsed_min={elapsed_total/60:.2f}")
     if model.equations_ is None or len(model.equations_) == 0:
         print(f"[PYSR] target={target_name}: no equations returned", flush=True)
         return pd.DataFrame()
@@ -1324,8 +1471,10 @@ def package_outputs_zip(out_dir: Path, archive_basename: str = "cfs_v18_FINAL_PA
 
 
 def main() -> int:
+    _print_run_banner("MAIN ENTRY")
     args = parse_args()
     out_dir = ensure_dir(args.out_dir)
+    _append_run_log(out_dir, f"MAIN ENTRY args={vars(args)}")
 
     # v18 self-locating ZIP: try the user-provided path, then a list of common
     # local paths, finally fall back to a GitHub raw download.
@@ -1504,4 +1653,18 @@ def main() -> int:
 
 
 if __name__ == "__main__":
-    raise SystemExit(main())
+    # v18+ wrap main() in a top-level guard so any unhandled exception
+    # surfaces with a complete traceback in the Kaggle log instead of being
+    # swallowed by papermill / IPython.
+    try:
+        rc = main()
+    except SystemExit:
+        raise
+    except Exception as _exc:
+        print("\n" + "=" * 90, flush=True)
+        print(f"[V18 FATAL] RUN_ID={RUN_ID} unhandled {type(_exc).__name__}: {_exc}", flush=True)
+        print("=" * 90, flush=True)
+        traceback.print_exc()
+        print("=" * 90, flush=True)
+        raise
+    raise SystemExit(rc)
