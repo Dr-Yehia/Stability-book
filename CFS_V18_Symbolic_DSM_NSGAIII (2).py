@@ -266,22 +266,30 @@ PYSR_DEFAULT_TARGETS = ["hybrid"]
 
 PRESETS = {
     "quick": {
+        # v18+ memory-safe Kaggle config: previous (1000, 80, 24) caused
+        # the Julia/PySR worker to grow large enough that Kaggle's commit
+        # runner intermittently restarted the whole kernel mid-fit. Halving
+        # the per-worker population footprint resolves the restart loop
+        # while keeping the overall search budget close to original.
         "niterations": 1000,
-        "population_size": 80,
-        "populations": 24,
-        "maxsize": 35,
+        "population_size": 50,
+        "populations": 16,
+        "maxsize": 30,
+        "procs": 2,
     },
     "strong": {
         "niterations": 5000,
-        "population_size": 120,
-        "populations": 40,
-        "maxsize": 45,
+        "population_size": 100,
+        "populations": 30,
+        "maxsize": 40,
+        "procs": 2,
     },
     "final": {
         "niterations": 15000,
-        "population_size": 150,
-        "populations": 60,
-        "maxsize": 55,
+        "population_size": 130,
+        "populations": 50,
+        "maxsize": 50,
+        "procs": 2,
     },
 }
 
@@ -917,6 +925,10 @@ def run_pysr_stage(
         population_size=cfg["population_size"],
         populations=cfg["populations"],
         maxsize=cfg["maxsize"],
+        # v18+ explicit procs cap: Kaggle's commit runner restarts the kernel
+        # if Julia/PySR threading grows past its memory budget. Limit threads
+        # to keep the worker stable.
+        procs=cfg.get("procs", 2),
         binary_operators=["+", "-", "*", "/"],
         unary_operators=["sqrt", "log1p", "square"],
         extra_sympy_mappings={},
