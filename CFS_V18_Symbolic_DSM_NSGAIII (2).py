@@ -1165,7 +1165,14 @@ def _clean_pysr_expression_string(s: Any) -> str:
 
 def expression_to_callable(expression: str, features: list[str]):
     sympy_module = importlib.import_module("sympy")
-    symbols = sympy_module.symbols(features)
+    # v18+ critical fix: sympy.symbols(list) returns a Python *list* of symbols,
+    # not a tuple. The previous code wrapped that list into a 1-tuple, which made
+    # lambdify build a function expecting a single argument (the list) and then
+    # crash with "_lambdifygenerated() takes 1 positional argument but N were
+    # given" when called with N feature arrays. Pass a space-joined string so
+    # sympy returns a true tuple of symbols, and normalize the single-feature
+    # case afterwards.
+    symbols = sympy_module.symbols(" ".join(features))
     if not isinstance(symbols, tuple):
         symbols = (symbols,)
     locals_map = {name: sym for name, sym in zip(features, symbols)}
@@ -1186,7 +1193,12 @@ def expression_to_callable(expression: str, features: list[str]):
     def _predict_g(frame: pd.DataFrame) -> np.ndarray:
         args = [frame[name].astype(float).values for name in features]
         values = func(*args)
-        return np.asarray(values, dtype=float)
+        values = np.asarray(values, dtype=float)
+        # Constant equations (e.g. g = -1.2581) collapse to a 0-d scalar; we
+        # need a per-row vector to align with the holdout frame.
+        if values.shape == ():
+            values = np.full(len(frame), float(values))
+        return values
 
     return _predict_g, str(expr)
 
