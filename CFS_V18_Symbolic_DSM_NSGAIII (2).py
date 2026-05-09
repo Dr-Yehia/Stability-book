@@ -937,9 +937,41 @@ def run_pysr_stage(
         # quality and the safety-filter pipeline are unaffected.
         deterministic=False,
         parallelism="multithreading",
-        progress=True,
+        # v18+ Kaggle stability: PySR's full Pareto-table progress print
+        # combined with Julia multithreading floods Kaggle's log buffer
+        # (~30 lines per cycle) and causes the notebook UI to appear frozen
+        # at the last visible iteration even when the Julia search is
+        # still progressing. Verbosity=0 + progress=False keeps the run
+        # silent until the final equations.csv is written.
+        verbosity=0,
+        progress=False,
     )
-    model.fit(x_train, y_train, variable_names=cols)
+    # Run PySR in a background thread so we can emit a heartbeat every 60s
+    # to Kaggle's log; this proves to the user the search is alive without
+    # spamming the buffer with full Pareto tables on every cycle.
+    import threading
+    import time as _time
+    fit_done = {"flag": False, "error": None}
+
+    def _fit_worker():
+        try:
+            model.fit(x_train, y_train, variable_names=cols)
+        except Exception as e:
+            fit_done["error"] = e
+        finally:
+            fit_done["flag"] = True
+
+    t = threading.Thread(target=_fit_worker, daemon=True)
+    t.start()
+    t0 = _time.monotonic()
+    print(f"[PYSR] target={target_name}: started silent fit on {len(x_train)} rows, {len(cols)} features", flush=True)
+    while not fit_done["flag"]:
+        t.join(timeout=60.0)
+        if not fit_done["flag"]:
+            elapsed = _time.monotonic() - t0
+            print(f"[PYSR] target={target_name}: alive @ {elapsed/60:.1f} min", flush=True)
+    if fit_done["error"] is not None:
+        raise fit_done["error"]
     equations = model.equations_.copy()
     equations.insert(0, "target_stage", target_name)
     equations.insert(1, "preset", preset)
