@@ -105,7 +105,7 @@ _KAGGLE = bool(os.environ.get("KAGGLE_KERNEL_RUN_TYPE")) or Path("/kaggle/workin
 # the saved log file. We also detect prior run artifacts and report them.
 # ---------------------------------------------------------------------------
 RUN_ID = _uuid.uuid4().hex[:12]
-RUN_START_ISO = _dt.datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ")
+RUN_START_ISO = _dt.datetime.now(_dt.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
 def _safe_psutil():
@@ -195,7 +195,7 @@ def _append_run_log(out_dir: Path, line: str) -> None:
     try:
         out_dir.mkdir(parents=True, exist_ok=True)
         marker = out_dir / ".v18_run_log.txt"
-        ts = _dt.datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ")
+        ts = _dt.datetime.now(_dt.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
         with open(marker, "a", encoding="utf-8") as f:
             f.write(f"{ts} RUN_ID={RUN_ID} {line}\n")
     except Exception:
@@ -1627,7 +1627,7 @@ def main() -> int:
         print(f"[OK] Wrote {out_dir / 'best_symbolic_equations.json'}")
 
     report = {
-        "script": Path(__file__).name,
+        "script": Path(globals().get("__file__", "CFS_V18_Symbolic_DSM_NSGAIII.py")).name,
         "formulation": "Pt/Py = DSM_local * exp(g_symbolic)",
         "official_features": OFFICIAL_FEATURES,
         "extended_audit_features": EXTENDED_AUDIT_FEATURES,
