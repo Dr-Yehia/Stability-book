@@ -1139,6 +1139,30 @@ def run_pysr_stage(
 # ---------------------------------------------------------------------------
 
 
+def _clean_pysr_expression_string(s: Any) -> str:
+    """Normalize PySR's equation output for sympy.sympify.
+
+    PySR's ``equation`` column often contains a display-format string like
+    ``y = lambda_led * -0.48639`` which sympify cannot parse because of the
+    ``y =`` prefix. We strip that prefix and any extra whitespace/newlines.
+    PySR also emits ``+ -X`` patterns and ``X^2`` powers occasionally; these
+    are valid sympy syntax but we normalize ``^`` to ``**`` defensively.
+    """
+    text = str(s).strip()
+    # Strip leading 'y = ' / 'y=' (case-insensitive)
+    low = text.lower().lstrip()
+    if low.startswith("y ="):
+        text = text[text.lower().index("y =") + 3 :].strip()
+    elif low.startswith("y="):
+        text = text[text.lower().index("y=") + 2 :].strip()
+    # Defensive: ^ → **
+    if "^" in text and "**" not in text:
+        text = text.replace("^", "**")
+    # Replace newlines/multiple spaces with single space (PySR sometimes wraps)
+    text = " ".join(text.split())
+    return text
+
+
 def expression_to_callable(expression: str, features: list[str]):
     sympy_module = importlib.import_module("sympy")
     symbols = sympy_module.symbols(features)
@@ -1156,7 +1180,7 @@ def expression_to_callable(expression: str, features: list[str]):
         "square": lambda x: x**2,
         "cube": lambda x: x**3,
     })
-    expr = sympy_module.sympify(str(expression), locals=locals_map)
+    expr = sympy_module.sympify(_clean_pysr_expression_string(expression), locals=locals_map)
     func = sympy_module.lambdify(symbols, expr, modules=["numpy"])
 
     def _predict_g(frame: pd.DataFrame) -> np.ndarray:
@@ -1187,9 +1211,19 @@ def evaluate_equations(
         holdout = symbolic.copy()
 
     rows = []
+    n_total = len(equations)
+    n_skipped = 0
+    n_succeeded = 0
+    n_failed = 0
     for i, eq_row in equations.reset_index(drop=True).iterrows():
-        expr = eq_row.get("equation") or eq_row.get("sympy_format") or eq_row.get("lambda_format")
+        # Prefer sympy_format (parseable) over equation (display, may have 'y =' prefix).
+        expr = eq_row.get("sympy_format")
         if pd.isna(expr) or str(expr).strip() == "":
+            expr = eq_row.get("equation")
+        if pd.isna(expr) or str(expr).strip() == "":
+            expr = eq_row.get("lambda_format")
+        if pd.isna(expr) or str(expr).strip() == "":
+            n_skipped += 1
             continue
         target_stage = str(eq_row.get("target_stage", "unknown"))
         complexity = float(eq_row.get("complexity", np.nan)) if pd.notna(eq_row.get("complexity", np.nan)) else float(len(str(expr)))
@@ -1202,6 +1236,9 @@ def evaluate_equations(
             pred = finite_clip(pred_fn(holdout), 0.0, 1.5)
             met = compute_metrics(holdout["PtPy_actual"], pred)
             if not met:
+                n_skipped += 1
+                if n_skipped <= 3:
+                    print(f"[EVAL] EQ_{i:04d} skipped: compute_metrics returned empty (probably all-NaN pred)", flush=True)
                 continue
             fairness = group_fairness_metrics(holdout, pred)
             mono = monotonicity_penalty(holdout, pred_fn)
@@ -1220,17 +1257,43 @@ def evaluate_equations(
                 **calib,
                 **singularity,
             })
+            n_succeeded += 1
         except Exception as exc:
+            n_failed += 1
+            if n_failed <= 5:
+                print(f"[EVAL] EQ_{i:04d} FAILED: {type(exc).__name__}: {exc} | expr_preview={str(expr)[:120]!r}", flush=True)
             rows.append({
                 "candidate_id": f"EQ_{i:04d}",
                 "target_stage": target_stage,
                 "equation": str(expr),
                 "complexity": complexity,
-                "evaluation_error": str(exc),
+                "evaluation_error": f"{type(exc).__name__}: {exc}",
             })
 
+    print(
+        f"[EVAL] equations={n_total} succeeded={n_succeeded} failed={n_failed} skipped={n_skipped}",
+        flush=True,
+    )
+
     table = pd.DataFrame(rows)
+    # Always persist whatever we got, even if everything failed, so the user
+    # can inspect evaluation_error in the CSV.
+    try:
+        table.to_csv(out_dir / "nsga3_candidate_evaluation.csv", index=False)
+    except Exception:
+        pass
+
     if table.empty:
+        print("[EVAL WARN] table is empty; no equations to rank.", flush=True)
+        return table
+
+    if "R2" not in table.columns or n_succeeded == 0:
+        print(
+            "[EVAL WARN] No equation produced valid metrics. "
+            f"Available columns: {list(table.columns)}. "
+            "Pareto/NSGA ranking is skipped; evaluation_error column has details.",
+            flush=True,
+        )
         return table
 
     numeric_cols = [
