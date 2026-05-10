@@ -1052,6 +1052,229 @@ def pysr_loss_function(alpha: float = 1.5, beta: float = 4.0) -> str:
     ).strip()
 
 
+# ---------------------------------------------------------------------------
+# v18.2 Manual Physical Family Fitting
+# ---------------------------------------------------------------------------
+# Pre-defined physics-motivated g-templates. Each entry is:
+#   (name, n_params, compute_g, param_names, p0, sympy_template)
+# compute_g(df, p) → 1-D numpy array of g values on the passed DataFrame.
+# sympy_template is a plain-text formula with symbolic param names a/b/c/C0;
+# after fitting we substitute the numerical values to get a parseable string.
+# ---------------------------------------------------------------------------
+_MANUAL_FAMILIES: list[tuple] = [
+    (
+        "const",
+        1,
+        lambda df, p: np.full(len(df), p[0]),
+        ["C0"], [0.0],
+        "{C0}",
+    ),
+    (
+        "linear_inter2",
+        2,
+        lambda df, p: p[0] * df["lambda_inter2"].astype(float).values + p[1],
+        ["a", "C0"], [-0.24, 0.0],
+        "{a}*lambda_inter2 + {C0}",
+    ),
+    (
+        "linear_inter",
+        2,
+        lambda df, p: p[0] * df["lambda_inter"].astype(float).values + p[1],
+        ["a", "C0"], [-0.15, 0.0],
+        "{a}*lambda_inter + {C0}",
+    ),
+    (
+        "inter2_hb",
+        2,
+        lambda df, p: p[0] * df["lambda_inter2"].astype(float).values * df["h_b"].astype(float).values + p[1],
+        ["a", "C0"], [-0.15, 0.0],
+        "{a}*lambda_inter2*h_b + {C0}",
+    ),
+    (
+        "inter_hb",
+        2,
+        lambda df, p: p[0] * df["lambda_inter"].astype(float).values * df["h_b"].astype(float).values + p[1],
+        ["a", "C0"], [-0.10, 0.0],
+        "{a}*lambda_inter*h_b + {C0}",
+    ),
+    (
+        "inter2_hb_logpne",
+        3,
+        lambda df, p: (
+            p[0] * df["lambda_inter2"].astype(float).values * df["h_b"].astype(float).values
+            + p[1] * df["log_pne"].astype(float).values
+            + p[2]
+        ),
+        ["a", "b", "C0"], [-0.15, 0.10, 0.0],
+        "{a}*lambda_inter2*h_b + {b}*log_pne + {C0}",
+    ),
+    (
+        "inter2_hb_logpcrl",
+        3,
+        lambda df, p: (
+            p[0] * df["lambda_inter2"].astype(float).values * df["h_b"].astype(float).values
+            + p[1] * df["log_pcrl"].astype(float).values
+            + p[2]
+        ),
+        ["a", "b", "C0"], [-0.15, 0.10, 0.0],
+        "{a}*lambda_inter2*h_b + {b}*log_pcrl + {C0}",
+    ),
+    (
+        "inter2_hb_both_logs",
+        4,
+        lambda df, p: (
+            p[0] * df["lambda_inter2"].astype(float).values * df["h_b"].astype(float).values
+            + p[1] * df["log_pne"].astype(float).values
+            + p[2] * df["log_pcrl"].astype(float).values
+            + p[3]
+        ),
+        ["a", "b", "c", "C0"], [-0.15, 0.10, 0.05, 0.0],
+        "{a}*lambda_inter2*h_b + {b}*log_pne + {c}*log_pcrl + {C0}",
+    ),
+    (
+        "inter2_hb_logpne_fye",
+        4,
+        lambda df, p: (
+            p[0] * df["lambda_inter2"].astype(float).values * df["h_b"].astype(float).values
+            + p[1] * df["log_pne"].astype(float).values
+            + p[2] * df["Fy_E"].astype(float).values
+            + p[3]
+        ),
+        ["a", "b", "c", "C0"], [-0.15, 0.10, 0.0, 0.0],
+        "{a}*lambda_inter2*h_b + {b}*log_pne + {c}*Fy_E + {C0}",
+    ),
+    (
+        "pcr_pne_inter2_hb",
+        3,
+        lambda df, p: (
+            p[0] * df["pcr_pne"].astype(float).values
+            + p[1] * df["lambda_inter2"].astype(float).values * df["h_b"].astype(float).values
+            + p[2]
+        ),
+        ["a", "b", "C0"], [0.05, -0.15, 0.0],
+        "{a}*pcr_pne + {b}*lambda_inter2*h_b + {C0}",
+    ),
+    (
+        "inter2_hb_pcr_pne_logpne",
+        4,
+        lambda df, p: (
+            p[0] * df["lambda_inter2"].astype(float).values * df["h_b"].astype(float).values
+            + p[1] * df["pcr_pne"].astype(float).values
+            + p[2] * df["log_pne"].astype(float).values
+            + p[3]
+        ),
+        ["a", "b", "c", "C0"], [-0.15, 0.05, 0.10, 0.0],
+        "{a}*lambda_inter2*h_b + {b}*pcr_pne + {c}*log_pne + {C0}",
+    ),
+]
+
+_MANUAL_BASELINES = ["DSM_local", "DSM_global", "base_geom", "base_mean", "base_min"]
+
+
+def run_manual_family_search(
+    symbolic: pd.DataFrame,
+    out_dir: Path,
+    baselines: list[str] | None = None,
+    max_nfev: int = 400,
+) -> pd.DataFrame:
+    """Fit physics-motivated g-templates on non-holdout rows and return an
+    equations DataFrame compatible with evaluate_equations.
+
+    For each baseline B and each family template g(features; params), we find
+    the params that minimise sum((g_fitted - log(PtPy_actual / B))^2) on the
+    non-holdout rows using scipy.optimize.least_squares. The fitted equation is
+    then formatted as a sympy-parseable string and returned alongside its PySR-
+    style columns so it flows directly into the NSGA ranking pipeline.
+
+    This brute-force over ~55 combinations completes in seconds and gives an
+    upper bound on how much a closed-form physics template can achieve on this
+    dataset before we commit hours to PySR distillation.
+    """
+    try:
+        import scipy.optimize as _opt
+    except Exception as exc:
+        print(f"[MANUAL] scipy unavailable: {exc!r}; skipping manual family search.")
+        return pd.DataFrame()
+
+    if baselines is None:
+        baselines = _MANUAL_BASELINES
+
+    train = symbolic[~symbolic["is_holdout"]].copy().reset_index(drop=True)
+    if len(train) < 30:
+        print("[MANUAL] Not enough non-holdout rows; skipping.")
+        return pd.DataFrame()
+
+    rows: list[dict] = []
+    n_ok = 0
+    n_fail = 0
+    for baseline_col in baselines:
+        if baseline_col not in symbolic.columns or symbolic[baseline_col].isna().all():
+            continue
+        base_train = train[baseline_col].astype(float).values
+        actual_train = train["PtPy_actual"].astype(float).values
+        mask = np.isfinite(base_train) & (base_train > 0) & np.isfinite(actual_train) & (actual_train > 0)
+        if mask.sum() < 30:
+            continue
+        target_g = np.log(actual_train[mask] / base_train[mask])
+        train_m = train[mask].reset_index(drop=True)
+
+        for fam_name, _n_p, compute_g, param_names, p0, template in _MANUAL_FAMILIES:
+            candidate_id = f"MF_{baseline_col}__{fam_name}"
+            try:
+                def _residuals(p, _df=train_m, _tg=target_g):
+                    g = compute_g(_df, p)
+                    g = np.where(np.isfinite(g), g, 1e6)
+                    return g - _tg
+
+                result = _opt.least_squares(
+                    _residuals,
+                    x0=np.array(p0, dtype=float),
+                    method="trf",
+                    max_nfev=max_nfev,
+                    x_scale="jac",
+                )
+                p_fit = result.x.tolist()
+
+                # Build sympy-parseable expression string
+                subs = {name: f"({v:.10g})" for name, v in zip(param_names, p_fit)}
+                expr_str = template.format(**subs)
+
+                # Complexity = count of arithmetic tokens as proxy
+                complexity = float(len(param_names) * 2 + template.count("*") + template.count("+"))
+
+                rows.append({
+                    "target_stage": f"manual_{baseline_col}",
+                    "preset": "manual_family",
+                    "seed": 0,
+                    "complexity": complexity,
+                    "loss": float(np.mean(result.fun ** 2)),
+                    "equation": expr_str,
+                    "score": 0.0,
+                    "sympy_format": expr_str,
+                    "lambda_format": "",
+                    "family": fam_name,
+                    "baseline_col": baseline_col,
+                    "params": str(dict(zip(param_names, [f"{v:.6g}" for v in p_fit]))),
+                    "n_train_rows": int(mask.sum()),
+                })
+                n_ok += 1
+            except Exception as exc:
+                n_fail += 1
+                if n_fail <= 3:
+                    print(f"[MANUAL] {candidate_id} FAILED: {exc!r}")
+
+    print(
+        f"[MANUAL] family search done: {n_ok} fitted, {n_fail} failed "
+        f"across {len(baselines)} baselines × {len(_MANUAL_FAMILIES)} families",
+        flush=True,
+    )
+    table = pd.DataFrame(rows)
+    if not table.empty:
+        table.to_csv(out_dir / "manual_family_equations.csv", index=False)
+        print(f"[MANUAL] Wrote {out_dir / 'manual_family_equations.csv'}")
+    return table
+
+
 def build_teacher_jitter_dataset(
     symbolic: pd.DataFrame,
     n_aug_per_row: int = 20,
@@ -1510,11 +1733,16 @@ def evaluate_equations(
                 refit_info = {"refit": "exception", "reason": f"{type(exc).__name__}: {exc}"}
                 eval_expr = original_expr
                 n_refit_skip += 1
+        # v18.2+: manual family equations may use a different baseline column.
+        eq_baseline_col = str(eq_row.get("baseline_col", "DSM_local"))
+        if eq_baseline_col not in holdout.columns or holdout[eq_baseline_col].isna().all():
+            eq_baseline_col = "DSM_local"
         try:
             g_fn, sympy_expr = expression_to_callable(eval_expr, features)
-            def pred_fn(frame: pd.DataFrame) -> np.ndarray:
+            _bl = eq_baseline_col  # capture for closure
+            def pred_fn(frame: pd.DataFrame, _b=_bl) -> np.ndarray:
                 g = finite_clip(g_fn(frame), -3.0, 3.0)
-                return np.asarray(frame["DSM_local"], dtype=float) * np.exp(g)
+                return np.asarray(frame[_b], dtype=float) * np.exp(g)
 
             pred = finite_clip(pred_fn(holdout), 0.0, 1.5)
             met = compute_metrics(holdout["PtPy_actual"], pred)
@@ -1530,6 +1758,7 @@ def evaluate_equations(
             rows.append({
                 "candidate_id": f"EQ_{i:04d}",
                 "target_stage": target_stage,
+                "baseline_col": eq_baseline_col,
                 "equation": eval_expr,
                 "equation_pysr_original": original_expr,
                 "sympy_equation": sympy_expr,
@@ -1814,6 +2043,31 @@ def parse_args() -> argparse.Namespace:
         help="Multiplicative noise sigma for teacher jitter (default 0.025 = 2.5%%).",
     )
     parser.add_argument("--no-package", action="store_true", help="Skip auto-zipping the output directory at the end.")
+    parser.add_argument(
+        "--manual-families",
+        dest="manual_families",
+        action="store_true",
+        default=True,
+        help=(
+            "v18.2+: fit physics-motivated g-templates on non-holdout rows "
+            "using scipy least-squares (enabled by default). Tests ~55 "
+            "combinations of 11 families × 5 baselines in seconds. Results "
+            "enter the NSGA ranking alongside PySR equations."
+        ),
+    )
+    parser.add_argument(
+        "--no-manual-families",
+        dest="manual_families",
+        action="store_false",
+        help="Disable manual physical family fitting.",
+    )
+    parser.add_argument(
+        "--manual-baselines",
+        nargs="+",
+        choices=_MANUAL_BASELINES,
+        default=_MANUAL_BASELINES,
+        help="Which baselines to try for manual family fitting.",
+    )
 
     # Kaggle / cloud notebook ergonomics: when run inside an IPython kernel
     # (Kaggle, Colab, Jupyter), sys.argv contains kernel-launcher flags such
@@ -1854,6 +2108,7 @@ def parse_args() -> argparse.Namespace:
             "--pysr-targets", "actual", "hybrid",
             "--seeds", "2026", "2027",
             "--refit-constants",
+            "--manual-families",
             "--out-dir", str(out_default),
         ]
         print(f"[BOOTSTRAP] Kaggle/IPython context detected -> auto-running with: {argv}")
@@ -2007,6 +2262,16 @@ def main() -> int:
 
     if args.candidate_equations is not None:
         all_equations.append(pd.read_csv(args.candidate_equations))
+
+    # v18.2+ manual physical family fitting — runs in seconds and provides a
+    # hard ceiling test: if these closed-form templates can't hit R^2 >= 0.85
+    # on the holdout, no amount of extra PySR time will do so either.
+    if args.manual_families:
+        mf_baselines = list(args.manual_baselines) if args.manual_baselines else _MANUAL_BASELINES
+        mf_eqs = run_manual_family_search(symbolic, out_dir, baselines=mf_baselines)
+        if not mf_eqs.empty:
+            all_equations.append(mf_eqs)
+            print(f"[INFO] Added {len(mf_eqs)} manual-family candidates to evaluation pool.")
 
     evaluated = pd.DataFrame()
     recommendations = {}
