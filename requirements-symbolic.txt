@@ -1,0 +1,7 @@
+# Optional research dependencies for CFS_V18_Symbolic_DSM_NSGAIII.py
+# Keep separate from requirements.txt so the Streamlit app is not forced to
+# install Julia/PySR-heavy symbolic-regression packages during deployment.
+-r requirements.txt
+pysr
+sympy
+pymoo

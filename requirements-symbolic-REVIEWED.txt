@@ -1,0 +1,16 @@
+# Research-only dependencies for CFS_V18_Symbolic_DSM_NSGAIII.py
+# Use this on Kaggle/local research runs, not on Streamlit Cloud.
+# Recommended Python: 3.11
+
+numpy
+pandas
+scikit-learn==1.6.1
+joblib
+matplotlib
+plotly
+xgboost
+lightgbm
+openpyxl
+sympy
+pymoo
+pysr
